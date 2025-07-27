@@ -109,26 +109,30 @@ router.put('/batch', authenticateSession, requireAdmin, async (req, res) => {
 
     const results = [];
     const errors = [];
+    const warnings = [];
 
     for (const config of configs) {
       try {
         const { config_key, config_value, description } = config;
         
         if (!config_key || config_value === undefined) {
-          errors.push(`配置 ${config_key} 缺少必要字段`);
+          warnings.push(`配置 ${config_key} 缺少必要字段，已跳过`);
           continue;
         }
 
         // 验证配置值
         const validationResult = validateConfigValue(config_key, config_value);
         if (!validationResult.valid) {
-          errors.push(`配置 ${config_key}: ${validationResult.error}`);
+          warnings.push(`配置 ${config_key}: ${validationResult.error}，已跳过`);
           continue;
         }
 
+        // 使用默认值（如果有），但优先使用用户提供的值
+        const finalValue = config_value !== undefined && config_value !== '' ? config_value : (validationResult.defaultValue || config_value);
+
         const result = await db.setSystemConfig(
           config_key, 
-          config_value, 
+          finalValue, 
           description, 
           req.session.userId
         );
@@ -139,11 +143,19 @@ router.put('/batch', authenticateSession, requireAdmin, async (req, res) => {
       }
     }
 
+    // 只有当真正的保存操作失败时才返回失败状态
+    // 验证错误只作为警告，不影响整体成功状态
+    const hasSuccessfulSaves = results.length > 0;
+    const hasCriticalErrors = errors.length > 0;
+    
     res.json({
-      success: errors.length === 0,
-      message: errors.length === 0 ? '所有配置更新成功' : '部分配置更新失败',
+      success: hasSuccessfulSaves && !hasCriticalErrors,
+      message: hasSuccessfulSaves 
+        ? (hasCriticalErrors ? '部分配置保存成功，但有些配置保存失败' : '配置保存成功') 
+        : '没有配置被保存',
       results,
-      errors
+      errors,
+      warnings
     });
   } catch (error) {
     console.error('Batch update configs error:', error);
@@ -241,6 +253,83 @@ router.get('/pending-users', authenticateSession, requireAdmin, async (req, res)
   }
 });
 
+// 获取系统信息（公开接口，用于系统信息页面）
+router.get('/public/system-info', async (req, res) => {
+  try {
+    // 获取图片统计
+    const imageStats = await db.getImageStats();
+    
+    // 获取用户统计
+    const allUsers = await db.getAllUsers();
+    const activeUsers = allUsers.filter(user => user.is_active === 1);
+    
+    // 获取系统配置
+    const registrationEnabled = await db.isRegistrationEnabled();
+    const maintenanceMode = await db.isMaintenanceMode();
+    const maxUsers = await db.getMaxUsersLimit();
+    
+    // 获取所有图片进行分类统计
+    const allImages = await db.getAllImages();
+    const localImages = allImages.filter(img => img.is_local === 1);
+    const urlImages = allImages.filter(img => img.is_local === 0);
+    
+    // 分类统计
+    const categoryStats = {};
+    allImages.forEach(img => {
+      if (img.category) {
+        categoryStats[img.category] = (categoryStats[img.category] || 0) + 1;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        // 图片统计
+        images: {
+          total: imageStats.total || 0,
+          landscape: imageStats.landscape || 0,
+          portrait: imageStats.portrait || 0,
+          categories: imageStats.categories || 0,
+          local: localImages.length,
+          url: urlImages.length,
+          categoryDetails: categoryStats
+        },
+        
+        // 用户统计
+        users: {
+          total: allUsers.length,
+          active: activeUsers.length,
+          inactive: allUsers.length - activeUsers.length
+        },
+        
+        // 系统状态
+        system: {
+          registration_enabled: registrationEnabled,
+          maintenance_mode: maintenanceMode,
+          max_users: maxUsers,
+          database_type: 'SQLite',
+          api_version: '1.0.0',
+          node_version: process.version,
+          uptime: Math.floor(process.uptime()),
+          memory_usage: process.memoryUsage(),
+          environment: process.env.NODE_ENV || 'development'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get system info error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: '获取系统信息失败',
+      data: {
+        images: { total: 0, landscape: 0, portrait: 0, categories: 0, local: 0, url: 0 },
+        users: { total: 0, active: 0, inactive: 0 },
+        system: { error: error.message }
+      }
+    });
+  }
+});
+
 // 配置值验证函数
 function validateConfigValue(key, value) {
   switch (key) {
@@ -253,6 +342,10 @@ function validateConfigValue(key, value) {
       break;
       
     case 'max_users':
+      // 如果值为空或undefined，使用默认值1000
+      if (!value || value === '') {
+        return { valid: true, defaultValue: '1000' };
+      }
       const num = parseInt(value);
       if (isNaN(num) || num < 1 || num > 100000) {
         return { valid: false, error: '用户数量限制必须是 1-100000 之间的数字' };
@@ -260,6 +353,10 @@ function validateConfigValue(key, value) {
       break;
       
     case 'registration_message':
+      // 允许空消息
+      if (!value || value === '') {
+        return { valid: true, defaultValue: '欢迎注册 Random Image API！' };
+      }
       if (typeof value !== 'string' || value.length > 500) {
         return { valid: false, error: '注册消息必须是不超过500字符的字符串' };
       }
@@ -267,7 +364,7 @@ function validateConfigValue(key, value) {
       
     default:
       // 对于未知配置项，进行基本验证
-      if (typeof value !== 'string' || value.length > 1000) {
+      if (value && (typeof value !== 'string' || value.length > 1000)) {
         return { valid: false, error: '配置值必须是不超过1000字符的字符串' };
       }
   }

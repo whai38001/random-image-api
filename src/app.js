@@ -9,6 +9,8 @@ const authRoutes = require('./routes/auth');
 const analyticsRoutes = require('./routes/analytics');
 const thumbnailRoutes = require('./routes/thumbnails');
 const systemRoutes = require('./routes/system');
+const searchRoutes = require('./routes/search');
+const adminRoutes = require('./routes/admin');
 const AnalyticsMiddleware = require('./middleware/analytics');
 const SecurityMiddleware = require('./middleware/security');
 const { checkAccess, authenticateSession } = require('./middleware/auth');
@@ -16,6 +18,7 @@ const { checkAccess, authenticateSession } = require('./middleware/auth');
 // 导入监控和日志系统
 const logger = require('./utils/logger');
 const performanceMonitor = require('./utils/performanceMonitor');
+const { errorHandler, notFoundHandler } = require('./utils/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,16 +29,56 @@ const analyticsMiddleware = new AnalyticsMiddleware();
 // 初始化安全中间件
 const securityMiddleware = new SecurityMiddleware();
 
+// 暴露安全中间件到全局，供管理工具使用
+global.securityMiddleware = securityMiddleware;
+
 // 初始化缩略图服务
 const ThumbnailService = require('./services/ThumbnailService');
 const thumbnailService = new ThumbnailService();
 
-// 安全中间件
-app.use(helmet({
-  contentSecurityPolicy: false, // 禁用CSP以支持内联样式
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" } // 允许跨域访问资源
-}));
+// 安全中间件 - HTTPS环境配置  
+app.use((req, res, next) => {
+  // 对于管理页面，使用更宽松的CSP
+  if (req.path.startsWith('/admin')) {
+    helmet({
+      contentSecurityPolicy: false, // 对管理页面禁用CSP
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    })(req, res, next);
+  } else {
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          scriptSrcAttr: ["'self'", "'unsafe-inline'"],
+          styleSrcAttr: ["'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+          connectSrc: ["'self'", "https://www.google-analytics.com", "https://analytics.google.com"],
+          fontSrc: ["'self'", "data:"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    })(req, res, next);
+  }
+});
 
 // 信任代理（用于获取真实IP）
 app.set('trust proxy', 1);
@@ -78,15 +121,34 @@ const authLimiter = rateLimit({
 
 app.use(globalLimiter);
 
-// CORS配置 - 默认允许所有跨域
+// CORS配置 - 支持HTTPS反向代理
 app.use(cors({
   origin: function (origin, callback) {
-    // 允许所有来源，包括没有origin的请求（如移动应用）
-    callback(null, true);
+    // 允许的域名列表
+    const allowedOrigins = [
+      'https://rp.itdianbao.com',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001'
+    ];
+    
+    // 允许没有origin的请求（如移动应用、API工具）
+    if (!origin) return callback(null, true);
+    
+    // 检查origin是否在允许列表中
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // 开发环境允许所有localhost
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        callback(null, true);
+      } else {
+        callback(null, true); // 暂时允许所有，可根据需要调整
+      }
+    }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Forwarded-For', 'X-Real-IP']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -105,9 +167,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true', // 生产环境+HTTPS时启用
+    secure: process.env.NODE_ENV === 'production', // 生产环境启用secure cookies
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24小时
+    maxAge: 24 * 60 * 60 * 1000, // 24小时
+    sameSite: 'lax' // HTTPS环境下的CSRF保护
   }
 }));
 
@@ -187,6 +250,7 @@ app.use(analyticsMiddleware.trackRequest());
 
 // API路由 - 应用API专用限流
 app.use('/api', apiLimiter, apiRoutes);
+app.use('/api/search', apiLimiter, searchRoutes);
 app.use('/auth', authLimiter, authRoutes);
 
 // 设置安全中间件实例并应用analytics路由
@@ -198,6 +262,9 @@ app.use('/thumbnails', thumbnailRoutes);
 
 // 系统配置路由
 app.use('/system', systemRoutes);
+
+// 管理员管理路由
+app.use('/admin', adminRoutes);
 
 // 管理后台路由保护
 app.use('/admin*', authenticateSession);
@@ -239,6 +306,11 @@ app.get('/monitoring/status', authenticateSession, (req, res) => {
   }
 });
 
+// 系统信息页面
+app.get('/system-info', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/system-info.html'));
+});
+
 // 根路径显示API文档
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/api-docs.html'));
@@ -274,16 +346,11 @@ app.get('/test-login', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/test-login.html'));
 });
 
-// 404处理
-app.use((req, res) => {
-  res.status(404).json({ error: '页面未找到' });
-});
+// 🚫 404处理 - 使用标准化响应
+app.use(notFoundHandler);
 
-// 全局错误处理
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: '服务器内部错误' });
-});
+// 🔥 全局错误处理 - 使用标准化错误处理
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   // 🚀 启动日志

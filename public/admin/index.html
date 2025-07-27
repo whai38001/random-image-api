@@ -141,7 +141,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
-            transition: background 0.3s;
+            transition: all 0.3s ease;
         }
         
         .btn:hover {
@@ -154,6 +154,19 @@
         
         .btn-danger:hover {
             background: #c0392b;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+        }
+        
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
         }
         
         .btn-secondary {
@@ -490,10 +503,15 @@
                 <div class="stat-number" id="categories">0</div>
                 <div>分类数量</div>
             </div>
+            <div class="stat-card" style="background: #f8f9fa; cursor: pointer;" onclick="forceUpdateStats()" title="点击刷新统计信息">
+                <div class="stat-number" style="font-size: 24px;">🔄</div>
+                <div>刷新统计</div>
+            </div>
         </div>
         
         <div class="tabs">
             <button class="tab active" onclick="showTab('upload')">上传图片</button>
+            <button class="tab" onclick="showTab('search')">搜索图片</button>
             <button class="tab" onclick="showTab('manage')">管理图片</button>
             <button class="tab" onclick="showTab('users')">账号管理</button>
             <button class="tab" onclick="showTab('security')">安全设置</button>
@@ -549,6 +567,106 @@
                 
                 <button type="submit" class="btn">添加图片</button>
             </form>
+        </div>
+        
+        <!-- 🔍 搜索图片标签页 -->
+        <div id="searchTab" class="tab-content">
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="form-group" style="flex: 2;">
+                    <label for="searchQuery">🔍 搜索关键词</label>
+                    <div style="position: relative;">
+                        <input type="text" id="searchQuery" placeholder="输入关键词搜索图片..." style="width: 100%; padding-right: 100px;">
+                        <button type="button" onclick="performSearch()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">搜索</button>
+                    </div>
+                    <div id="searchSuggestions" style="position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; display: none; max-height: 200px; overflow-y: auto;"></div>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="button" onclick="showAllImages()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">显示所有图片</button>
+                </div>
+            </div>
+            
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="searchCategory">分类</label>
+                    <select id="searchCategory" onchange="performSearch()">
+                        <option value="">所有分类</option>
+                        <option value="landscape">风景</option>
+                        <option value="anime">动漫</option>
+                        <option value="beauty">美女</option>
+                        <option value="nature">自然</option>
+                        <option value="city">城市</option>
+                        <option value="art">艺术</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchOrientation">方向</label>
+                    <select id="searchOrientation" onchange="performSearch()">
+                        <option value="">所有方向</option>
+                        <option value="landscape">横向</option>
+                        <option value="portrait">纵向</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchType">类型</label>
+                    <select id="searchType" onchange="performSearch()">
+                        <option value="">所有类型</option>
+                        <option value="local">本地图片</option>
+                        <option value="url">URL图片</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchSort">排序</label>
+                    <select id="searchSort" onchange="performSearch()">
+                        <option value="newest">最新上传</option>
+                        <option value="oldest">最早上传</option>
+                        <option value="random">随机排序</option>
+                    </select>
+                </div>
+            </div>
+            
+            
+            <!-- 搜索结果统计 -->
+            <div id="searchStats" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span id="searchResultCount"></span>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span>每页显示:</span>
+                        <select id="searchLimit" onchange="performSearch()" style="padding: 4px 8px;">
+                            <option value="12">12</option>
+                            <option value="24">24</option>
+                            <option value="36">36</option>
+                            <option value="48">48</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 批量操作工具栏 -->
+                <div id="batchActions" style="display: flex; gap: 10px; align-items: center; padding: 10px; background: white; border-radius: 6px; border: 1px solid #dee2e6;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="selectAllImages" onchange="toggleSelectAll()" style="transform: scale(1.2);">
+                        <label for="selectAllImages" style="font-weight: bold; color: #495057;">全选</label>
+                    </div>
+                    <div style="border-left: 1px solid #dee2e6; height: 20px;"></div>
+                    <span id="selectedCount" style="color: #6c757d; font-size: 14px;">已选择 0 张图片</span>
+                    <div style="margin-left: auto; display: flex; gap: 8px;">
+                        <button id="batchDeleteBtn" onclick="showBatchDeleteOptions()" disabled 
+                                style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; opacity: 0.5;">
+                            批量删除
+                        </button>
+                        <button id="batchEditBtn" onclick="showBatchEditOptions()" disabled 
+                                style="padding: 6px 12px; background: #ffc107; color: #212529; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; opacity: 0.5;">
+                            批量编辑
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 搜索结果 -->
+            <div id="searchResults"></div>
+            
+            <!-- 分页导航 -->
+            <div id="searchPagination"></div>
         </div>
         
         <div id="manageTab" class="tab-content">
@@ -657,6 +775,30 @@
                 </div>
             </div>
             
+            <div style="margin-bottom: 30px;">
+                <h3>📧 修改邮箱</h3>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <form id="changeEmailForm" style="max-width: 400px;">
+                        <div class="form-group">
+                            <label for="currentEmail">当前邮箱</label>
+                            <input type="email" id="currentEmail" readonly style="background: #f8f9fa;" placeholder="获取中...">
+                            <small style="color: #666; font-size: 12px;">当前绑定的邮箱地址</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="newEmail">新邮箱</label>
+                            <input type="email" id="newEmail" required placeholder="请输入新的邮箱地址">
+                            <small style="color: #666; font-size: 12px;">请输入有效的邮箱地址</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="emailPassword">确认密码</label>
+                            <input type="password" id="emailPassword" required placeholder="请输入当前密码确认身份">
+                            <small style="color: #666; font-size: 12px;">输入当前密码以确认身份</small>
+                        </div>
+                        <button type="submit" class="btn">修改邮箱</button>
+                    </form>
+                </div>
+            </div>
+            
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3>访问控制规则</h3>
@@ -665,6 +807,38 @@
                 
                 <div id="accessRulesContainer" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
                     <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>🔒 IP限制管理</h3>
+                    <div>
+                        <button class="btn" onclick="refreshBlockedIPs()" style="margin-right: 10px;">刷新</button>
+                        <button class="btn btn-warning" onclick="clearAllIPRestrictions()">清除所有限制</button>
+                    </div>
+                </div>
+                
+                <div id="ipManagementContainer" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 15px;">
+                        <strong>当前被限制的IP地址：</strong>
+                        <span id="blockedIPCount" style="color: #dc3545;">0</span> 个
+                    </div>
+                    
+                    <div id="blockedIPsList">
+                        <div class="loading">加载中...</div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                        <h4 style="margin-top: 0;">紧急清除IP限制</h4>
+                        <p style="color: #666; font-size: 14px;">如果你的IP被误封，可以使用以下方法解除：</p>
+                        <ul style="color: #666; font-size: 14px; margin: 10px 0;">
+                            <li>重启服务器（最简单的方法）</li>
+                            <li>使用命令行工具：<code>node ip-management.js clear</code></li>
+                            <li>等待自动解除（1小时后自动清除）</li>
+                        </ul>
+                        <button class="btn btn-danger" onclick="emergencyClearIP()">🚨 紧急清除所有IP限制</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -696,7 +870,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="maxUsers">用户数量限制</label>
-                                <input type="number" id="maxUsers" name="max_users" min="1" max="100000" placeholder="最大用户数">
+                                <input type="number" id="maxUsers" name="max_users" min="1" max="100000" value="1000" placeholder="最大用户数">
                             </div>
                             <div class="form-group">
                                 <label for="maintenanceMode">维护模式</label>
@@ -714,19 +888,8 @@
                                 style="width: 100%; padding: 12px 15px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 16px; resize: vertical; min-height: 80px;"></textarea>
                         </div>
                         
-                        <button type="submit" class="btn">保存设置</button>
+                        <button type="submit" class="btn" style="transition: all 0.3s ease;">保存设置</button>
                     </form>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 30px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3>待审核用户</h3>
-                    <button class="btn btn-secondary" onclick="loadPendingUsers()">刷新</button>
-                </div>
-                
-                <div id="pendingUsersContainer" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                    <div class="loading">加载中...</div>
                 </div>
             </div>
             
@@ -746,10 +909,15 @@
         <div class="modal-content">
             <span class="close" onclick="closeCreateUserModal()">&times;</span>
             <h2>添加新账号</h2>
+            
+            <!-- 错误提示区域 -->
+            <div class="alert alert-error" id="createUserErrorAlert" style="display: none;"></div>
+            
             <form id="createUserForm">
                 <div class="form-group">
                     <label for="newUsername">用户名</label>
                     <input type="text" id="newUsername" required>
+                    <small style="color: #666; font-size: 12px;">3-20位，只能包含字母、数字、下划线</small>
                 </div>
                 <div class="form-group">
                     <label for="newUserPassword">密码</label>
@@ -759,12 +927,18 @@
                 <div class="form-group">
                     <label for="newUserEmail">邮箱</label>
                     <input type="email" id="newUserEmail">
+                    <small style="color: #666; font-size: 12px;">可选，用于找回密码等功能</small>
                 </div>
                 <div class="form-group">
                     <label for="newUserRole">角色</label>
                     <select id="newUserRole" required>
+                        <option value="user">普通用户</option>
                         <option value="admin">管理员</option>
                     </select>
+                    <small style="color: #666; font-size: 12px;">
+                        普通用户：只能查看和使用API<br>
+                        管理员：拥有完整管理权限
+                    </small>
                 </div>
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">取消</button>
@@ -862,6 +1036,12 @@
         let currentPagination = null;
         let currentUser = null;
         
+        // 搜索相关变量
+        let searchCurrentPage = 1;
+        let searchTotalPages = 1;
+        let searchCurrentQuery = '';
+        let searchTimeout = null;
+        
         // 页面加载时检查登录状态
         document.addEventListener('DOMContentLoaded', function() {
             checkLoginStatus();
@@ -881,7 +1061,16 @@
                 
                 currentUser = data.user;
                 document.getElementById('userInfo').textContent = `欢迎，${data.user.username}`;
-                updateStats();
+                
+                // 强制刷新统计信息
+                setTimeout(() => {
+                    forceUpdateStats();
+                }, 500);
+                
+                // 初始化系统设置（为系统设置页面做准备）
+                setTimeout(() => {
+                    loadSystemSettings();
+                }, 200);
             } catch (error) {
                 console.error('Check login status failed:', error);
                 window.location.href = '/login';
@@ -916,13 +1105,14 @@
             if (tabName === 'manage') {
                 loadImages(1);
                 loadThumbnailStats();
+            } else if (tabName === 'search') {
+                setupSearchEventListeners();
             } else if (tabName === 'users') {
                 loadUsers();
             } else if (tabName === 'security') {
                 loadAccessRules();
             } else if (tabName === 'system') {
                 loadSystemSettings();
-                loadPendingUsers();
                 loadSystemInfo();
             }
         }
@@ -1594,7 +1784,19 @@
                                 <td style="padding: 12px;">${user.last_login ? new Date(user.last_login).toLocaleString() : '从未登录'}</td>
                                 <td style="padding: 12px;">
                                     ${user.id !== currentUser.id ? `
-                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteUser(${user.id})">删除</button>
+                                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                            <button class="btn ${user.is_active ? 'btn-warning' : 'btn-success'}" 
+                                                    style="padding: 4px 8px; font-size: 12px;" 
+                                                    onclick="toggleUserStatus(${user.id}, '${user.username}', ${user.is_active})">
+                                                ${user.is_active ? '禁用' : '启用'}
+                                            </button>
+                                            <button class="btn btn-danger" 
+                                                    style="padding: 4px 8px; font-size: 12px;" 
+                                                    onclick="deleteUser(${user.id}, '${user.username}')"
+                                                    ${user.role === 'admin' ? 'disabled title="不能删除管理员账户"' : ''}>
+                                                删除
+                                            </button>
+                                        </div>
                                     ` : '<span style="color: #666; font-size: 12px;">当前用户</span>'}
                                 </td>
                             </tr>
@@ -1608,21 +1810,83 @@
         
         function showCreateUserModal() {
             document.getElementById('createUserModal').style.display = 'block';
+            // 清除之前的错误信息
+            document.getElementById('createUserErrorAlert').style.display = 'none';
         }
         
         function closeCreateUserModal() {
             document.getElementById('createUserModal').style.display = 'none';
             document.getElementById('createUserForm').reset();
+            // 清除错误信息
+            document.getElementById('createUserErrorAlert').style.display = 'none';
+        }
+        
+        // 在模态框中显示错误信息
+        function showCreateUserError(message) {
+            const errorAlert = document.getElementById('createUserErrorAlert');
+            errorAlert.textContent = message;
+            errorAlert.style.display = 'block';
+            
+            // 自动隐藏错误信息
+            setTimeout(() => {
+                errorAlert.style.display = 'none';
+            }, 5000);
         }
         
         document.getElementById('createUserForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            // 防止重复提交
+            if (submitBtn.disabled) return;
+            
+            // 获取表单数据
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newUserPassword').value;
+            const email = document.getElementById('newUserEmail').value.trim();
+            const role = document.getElementById('newUserRole').value;
+            
+            // 客户端验证
+            if (!username || !password) {
+                showCreateUserError('❌ 用户名和密码是必填项');
+                return;
+            }
+            
+            // 验证密码强度
+            if (password.length < 6) {
+                showCreateUserError('❌ 密码长度至少6位');
+                return;
+            }
+            
+            if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+                showCreateUserError('❌ 密码必须包含字母和数字');
+                return;
+            }
+            
+            // 验证用户名格式
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+                showCreateUserError('❌ 用户名只能包含字母、数字、下划线，长度3-20位');
+                return;
+            }
+            
+            // 验证邮箱格式（如果填写了）
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showCreateUserError('❌ 请输入有效的邮箱地址');
+                return;
+            }
+            
+            // 显示创建状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '创建中...';
+            submitBtn.style.opacity = '0.7';
+            
             const formData = new FormData();
-            formData.append('username', document.getElementById('newUsername').value);
-            formData.append('password', document.getElementById('newUserPassword').value);
-            formData.append('email', document.getElementById('newUserEmail').value);
-            formData.append('role', document.getElementById('newUserRole').value);
+            formData.append('username', username);
+            formData.append('password', password);
+            formData.append('email', email);
+            formData.append('role', role);
             
             try {
                 const response = await fetch('/auth/users', {
@@ -1634,19 +1898,69 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showAlert('用户创建成功', 'success');
-                    closeCreateUserModal();
-                    loadUsers();
+                    // 成功提示
+                    const roleName = role === 'admin' ? '管理员' : '普通用户';
+                    showAlert(`🎉 ${roleName}账户创建成功！用户名：${username}`, 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    submitBtn.style.background = '#28a745';
+                    submitBtn.textContent = '✅ 创建成功';
+                    
+                    // 2秒后关闭模态框并恢复
+                    setTimeout(() => {
+                        closeCreateUserModal();
+                        loadUsers(); // 刷新用户列表
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 1500);
                 } else {
-                    showAlert(data.error || '创建用户失败', 'error');
+                    showCreateUserError('❌ ' + (data.error || '创建用户失败'));
+                    
+                    // 显示错误状态
+                    submitBtn.style.background = '#dc3545';
+                    submitBtn.textContent = '❌ 创建失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
                 }
             } catch (error) {
-                showAlert('网络错误：' + error.message, 'error');
+                showCreateUserError('🌐 网络错误：' + error.message);
+                
+                // 显示错误状态
+                submitBtn.style.background = '#dc3545';
+                submitBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    submitBtn.style.background = '';
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '';
+                }, 2000);
             }
         });
         
-        async function deleteUser(userId) {
-            if (!confirm('确定要删除这个用户吗？')) return;
+        async function deleteUser(userId, username) {
+            if (!confirm(`确定要删除用户 "${username}" 吗？\n\n此操作将永久删除用户账户，无法恢复！`)) return;
+            
+            // 找到对应的删除按钮
+            const deleteBtn = event.target;
+            const originalText = deleteBtn.textContent;
+            
+            // 防止重复操作
+            if (deleteBtn.disabled) return;
+            
+            // 显示删除状态
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = '删除中...';
+            deleteBtn.style.opacity = '0.7';
             
             try {
                 const response = await fetch(`/auth/users/${userId}`, {
@@ -1657,13 +1971,113 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showAlert('用户删除成功', 'success');
-                    loadUsers();
+                    showAlert(`🗑️ 用户 "${username}" 删除成功`, 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    deleteBtn.style.background = '#28a745';
+                    deleteBtn.textContent = '✅ 已删除';
+                    
+                    // 1秒后刷新用户列表
+                    setTimeout(() => {
+                        loadUsers();
+                    }, 1000);
                 } else {
-                    showAlert(data.error || '删除用户失败', 'error');
+                    showAlert('❌ ' + (data.error || '删除用户失败'), 'error');
+                    
+                    // 显示错误状态
+                    deleteBtn.style.background = '#dc3545';
+                    deleteBtn.textContent = '❌ 删除失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        deleteBtn.style.background = '';
+                        deleteBtn.textContent = originalText;
+                        deleteBtn.disabled = false;
+                        deleteBtn.style.opacity = '';
+                    }, 2000);
                 }
             } catch (error) {
-                showAlert('网络错误：' + error.message, 'error');
+                showAlert('🌐 网络错误：' + error.message, 'error');
+                
+                // 显示错误状态
+                deleteBtn.style.background = '#dc3545';
+                deleteBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    deleteBtn.style.background = '';
+                    deleteBtn.textContent = originalText;
+                    deleteBtn.disabled = false;
+                    deleteBtn.style.opacity = '';
+                }, 2000);
+            }
+        }
+
+        // 切换用户状态（禁用/启用）
+        async function toggleUserStatus(userId, username, currentStatus) {
+            const action = currentStatus ? '禁用' : '启用';
+            if (!confirm(`确定要${action}用户 "${username}" 吗？`)) return;
+            
+            // 找到对应的状态切换按钮
+            const toggleBtn = event.target;
+            const originalText = toggleBtn.textContent;
+            
+            // 防止重复操作
+            if (toggleBtn.disabled) return;
+            
+            // 显示处理状态
+            toggleBtn.disabled = true;
+            toggleBtn.textContent = '处理中...';
+            toggleBtn.style.opacity = '0.7';
+            
+            try {
+                const response = await fetch(`/auth/users/${userId}/toggle-status`, {
+                    method: 'PATCH',
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert(`🔄 ${data.message}`, 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    toggleBtn.style.background = '#28a745';
+                    toggleBtn.textContent = '✅ ' + (currentStatus ? '已禁用' : '已启用');
+                    
+                    // 1.5秒后刷新用户列表
+                    setTimeout(() => {
+                        loadUsers();
+                    }, 1500);
+                } else {
+                    showAlert('❌ ' + (data.error || `${action}用户失败`), 'error');
+                    
+                    // 显示错误状态
+                    toggleBtn.style.background = '#dc3545';
+                    toggleBtn.textContent = '❌ 操作失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        toggleBtn.style.background = '';
+                        toggleBtn.textContent = originalText;
+                        toggleBtn.disabled = false;
+                        toggleBtn.style.opacity = '';
+                    }, 2000);
+                }
+            } catch (error) {
+                showAlert('🌐 网络错误：' + error.message, 'error');
+                
+                // 显示错误状态
+                toggleBtn.style.background = '#dc3545';
+                toggleBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    toggleBtn.style.background = '';
+                    toggleBtn.textContent = originalText;
+                    toggleBtn.disabled = false;
+                    toggleBtn.style.opacity = '';
+                }, 2000);
             }
         }
         
@@ -1671,14 +2085,25 @@
         document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
             const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             
             if (newPassword !== confirmPassword) {
-                showAlert('新密码和确认密码不一致', 'error');
+                showAlert('❌ 新密码和确认密码不一致', 'error');
                 return;
             }
+            
+            // 防止重复提交
+            if (submitBtn.disabled) return;
+            
+            // 显示修改状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '修改中...';
+            submitBtn.style.opacity = '0.7';
             
             const formData = new FormData();
             formData.append('currentPassword', currentPassword);
@@ -1694,15 +2119,163 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showAlert('密码修改成功', 'success');
-                    document.getElementById('changePasswordForm').reset();
+                    showAlert('🔐 密码修改成功！下次登录请使用新密码', 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    submitBtn.style.background = '#28a745';
+                    submitBtn.textContent = '✅ 修改成功';
+                    
+                    // 重置表单并恢复按钮
+                    setTimeout(() => {
+                        document.getElementById('changePasswordForm').reset();
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
                 } else {
-                    showAlert(data.error || '修改密码失败', 'error');
+                    showAlert('❌ ' + (data.error || '修改密码失败'), 'error');
+                    
+                    // 显示错误状态
+                    submitBtn.style.background = '#dc3545';
+                    submitBtn.textContent = '❌ 修改失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
                 }
             } catch (error) {
-                showAlert('网络错误：' + error.message, 'error');
+                showAlert('🌐 网络错误：' + error.message, 'error');
+                
+                // 显示错误状态
+                submitBtn.style.background = '#dc3545';
+                submitBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    submitBtn.style.background = '';
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '';
+                }, 2000);
             }
         });
+        
+        // 邮箱修改功能
+        document.getElementById('changeEmailForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            const newEmail = document.getElementById('newEmail').value;
+            const password = document.getElementById('emailPassword').value;
+            
+            if (!newEmail || !password) {
+                showAlert('❌ 请填写所有必需字段', 'error');
+                return;
+            }
+            
+            // 验证邮箱格式
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(newEmail)) {
+                showAlert('❌ 请输入有效的邮箱地址', 'error');
+                return;
+            }
+            
+            // 防止重复提交
+            if (submitBtn.disabled) return;
+            
+            // 显示修改状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '修改中...';
+            submitBtn.style.opacity = '0.7';
+            
+            try {
+                const response = await fetch('/auth/update-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        newEmail: newEmail,
+                        currentPassword: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert('📧 邮箱修改成功！新邮箱：' + newEmail, 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    submitBtn.style.background = '#28a745';
+                    submitBtn.textContent = '✅ 修改成功';
+                    
+                    // 重置表单并更新显示
+                    setTimeout(() => {
+                        document.getElementById('changeEmailForm').reset();
+                        document.getElementById('currentEmail').value = newEmail;
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
+                } else {
+                    showAlert('❌ ' + (data.error || '修改邮箱失败'), 'error');
+                    
+                    // 显示错误状态
+                    submitBtn.style.background = '#dc3545';
+                    submitBtn.textContent = '❌ 修改失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
+                }
+            } catch (error) {
+                showAlert('🌐 网络错误：' + error.message, 'error');
+                
+                // 显示错误状态
+                submitBtn.style.background = '#dc3545';
+                submitBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    submitBtn.style.background = '';
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '';
+                }, 2000);
+            }
+        });
+        
+        // 加载当前用户邮箱
+        async function loadCurrentUserEmail() {
+            try {
+                const response = await fetch('/auth/profile', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        document.getElementById('currentEmail').value = data.user.email || '未设置';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load user email:', error);
+                document.getElementById('currentEmail').value = '加载失败';
+            }
+        }
         
         // 访问控制功能
         async function loadAccessRules() {
@@ -1827,7 +2400,10 @@
         async function updateStats() {
             try {
                 const response = await fetch('/api/images?paginated=false');
-                const images = await response.json();
+                const result = await response.json();
+                
+                // 处理API响应格式
+                const images = result.success ? result.data : (Array.isArray(result) ? result : []);
                 
                 const total = images.length;
                 const landscape = images.filter(img => img.orientation === 'landscape').length;
@@ -1840,6 +2416,11 @@
                 document.getElementById('categories').textContent = categories;
             } catch (error) {
                 console.error('Failed to update stats:', error);
+                // 设置默认值
+                document.getElementById('totalImages').textContent = '0';
+                document.getElementById('landscapeImages').textContent = '0';
+                document.getElementById('portraitImages').textContent = '0';
+                document.getElementById('categories').textContent = '0';
             }
         }
         
@@ -1856,11 +2437,18 @@
                     // 只获取统计数据，不获取完整图片列表
                     const response = await fetch('/api/stats');
                     if (response.ok) {
-                        const stats = await response.json();
-                        document.getElementById('totalImages').textContent = stats.total || 0;
-                        document.getElementById('landscapeImages').textContent = stats.landscape || 0;
-                        document.getElementById('portraitImages').textContent = stats.portrait || 0;
-                        document.getElementById('categories').textContent = stats.categories || 0;
+                        const result = await response.json();
+                        
+                        if (result.success && result.data) {
+                            const stats = result.data;
+                            document.getElementById('totalImages').textContent = stats.total || 0;
+                            document.getElementById('landscapeImages').textContent = stats.landscape || 0;
+                            document.getElementById('portraitImages').textContent = stats.portrait || 0;
+                            document.getElementById('categories').textContent = stats.categories || 0;
+                        } else {
+                            // 回退到原方法
+                            updateStats();
+                        }
                     } else {
                         // 回退到原方法
                         updateStats();
@@ -1962,28 +2550,129 @@
         // 系统设置功能
         async function loadSystemSettings() {
             try {
+                // 首先确保默认配置存在
+                await ensureDefaultConfigs();
+                
                 const response = await fetch('/system', {
                     credentials: 'include'
                 });
                 const configs = await response.json();
                 
-                // 填充表单
+                // 定义默认配置值
+                const defaultConfigs = {
+                    'registration_enabled': 'true',
+                    'registration_require_approval': 'false',
+                    'max_users': '1000',
+                    'site_maintenance': 'false',
+                    'registration_message': '欢迎注册 Random Image API！'
+                };
+                
+                // 创建配置映射
+                const configMap = {};
                 if (configs && Array.isArray(configs)) {
                     configs.forEach(config => {
-                        const element = document.querySelector(`[name="${config.config_key}"]`);
-                        if (element) {
-                            element.value = config.config_value;
-                        }
+                        configMap[config.config_key] = config.config_value;
                     });
                 }
+                
+                // 填充表单，使用实际配置值或默认值
+                Object.keys(defaultConfigs).forEach(key => {
+                    const element = document.querySelector(`[name="${key}"]`);
+                    if (element) {
+                        // 优先使用实际配置值，如果没有则使用默认值
+                        const value = configMap[key] !== undefined ? configMap[key] : defaultConfigs[key];
+                        element.value = value;
+                    }
+                });
             } catch (error) {
                 console.error('Load system settings error:', error);
                 showAlert('加载系统设置失败', 'error');
+                
+                // 即使出错也设置默认值
+                setDefaultSystemSettings();
             }
+        }
+        
+        // 确保默认配置存在
+        async function ensureDefaultConfigs() {
+            try {
+                // 先获取现有配置
+                const response = await fetch('/system', {
+                    credentials: 'include'
+                });
+                let existingConfigs = [];
+                if (response.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data)) {
+                        existingConfigs = data.map(config => config.config_key);
+                    }
+                }
+                
+                const defaultConfigs = [
+                    { key: 'registration_enabled', value: 'true', description: '是否允许用户注册' },
+                    { key: 'registration_require_approval', value: 'false', description: '注册后是否需要管理员审核' },
+                    { key: 'max_users', value: '1000', description: '最大用户数量限制' },
+                    { key: 'site_maintenance', value: 'false', description: '网站维护模式' },
+                    { key: 'registration_message', value: '欢迎注册 Random Image API！', description: '注册页面显示消息' }
+                ];
+                
+                // 为每个缺失的配置创建默认值
+                for (const config of defaultConfigs) {
+                    // 只有当配置不存在时才创建
+                    if (!existingConfigs.includes(config.key)) {
+                        try {
+                            await fetch('/system', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    config_key: config.key,
+                                    config_value: config.value,
+                                    description: config.description
+                                })
+                            });
+                        } catch (error) {
+                            // 如果配置已存在或其他错误，忽略
+                            console.log(`Config ${config.key} already exists or error occurred`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to ensure default configs:', error);
+            }
+        }
+        
+        // 设置默认系统设置
+        function setDefaultSystemSettings() {
+            const defaultConfigs = {
+                'registration_enabled': 'true',
+                'registration_require_approval': 'false',
+                'max_users': '1000',
+                'site_maintenance': 'false',
+                'registration_message': '欢迎注册 Random Image API！'
+            };
+            
+            Object.keys(defaultConfigs).forEach(key => {
+                const element = document.querySelector(`[name="${key}"]`);
+                if (element) {
+                    element.value = defaultConfigs[key];
+                }
+            });
         }
         
         document.getElementById('registrationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            // 防止重复提交
+            if (submitBtn.disabled) return;
+            
+            // 显示保存状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = '保存中...';
+            submitBtn.style.opacity = '0.7';
             
             const formData = new FormData(e.target);
             const configs = [];
@@ -2009,15 +2698,70 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    showAlert('系统设置保存成功', 'success');
-                    if (data.errors && data.errors.length > 0) {
-                        showAlert('部分设置保存失败：' + data.errors.join(', '), 'error');
+                    // 成功提示
+                    showAlert('🎉 系统设置保存成功！注册控制设置已更新', 'success');
+                    
+                    // 临时改变按钮样式表示成功
+                    submitBtn.style.background = '#28a745';
+                    submitBtn.textContent = '✅ 保存成功';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
+                    
+                    // 显示警告信息（如果有）
+                    if (data.warnings && data.warnings.length > 0) {
+                        setTimeout(() => {
+                            showAlert('⚠️ 注意：' + data.warnings.join(', '), 'error');
+                        }, 1000);
                     }
+                    
+                    // 显示错误信息（如果有）
+                    if (data.errors && data.errors.length > 0) {
+                        setTimeout(() => {
+                            showAlert('❌ 部分设置保存失败：' + data.errors.join(', '), 'error');
+                        }, 1500);
+                    }
+                    
+                    // 刷新系统信息以反映新设置
+                    setTimeout(() => {
+                        loadSystemInfo();
+                        // 重新加载系统设置以显示保存的值
+                        loadSystemSettings();
+                    }, 500);
                 } else {
-                    showAlert(data.error || '保存系统设置失败', 'error');
+                    showAlert('❌ ' + (data.error || '保存系统设置失败'), 'error');
+                    
+                    // 显示错误状态
+                    submitBtn.style.background = '#dc3545';
+                    submitBtn.textContent = '❌ 保存失败';
+                    
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        submitBtn.style.background = '';
+                        submitBtn.textContent = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 2000);
                 }
             } catch (error) {
-                showAlert('网络错误：' + error.message, 'error');
+                showAlert('🌐 网络错误：' + error.message, 'error');
+                
+                // 显示错误状态
+                submitBtn.style.background = '#dc3545';
+                submitBtn.textContent = '❌ 网络错误';
+                
+                // 2秒后恢复按钮
+                setTimeout(() => {
+                    submitBtn.style.background = '';
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '';
+                }, 2000);
             }
         });
         
@@ -2113,36 +2857,39 @@
         async function loadSystemInfo() {
             try {
                 const [statsResponse, configResponse] = await Promise.all([
-                    fetch('/api/images?paginated=false'),
+                    fetch('/api/stats'),
                     fetch('/system/public/registration-status')
                 ]);
                 
-                const images = await statsResponse.json();
+                const stats = await statsResponse.json();
                 const systemStatus = await configResponse.json();
+                
+                // 处理API响应格式
+                const imageCount = stats.success ? stats.data.total : 0;
+                const currentUsers = systemStatus.current_users || 0;
+                const maxUsers = systemStatus.max_users || 1000;
+                const registrationEnabled = systemStatus.registration_enabled || false;
+                const maintenanceMode = systemStatus.maintenance_mode || false;
                 
                 const systemInfo = `
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
                         <div style="text-align: center;">
-                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${images.length}</div>
-                            <div>总图片数量</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${systemStatus.current_users}</div>
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${currentUsers}</div>
                             <div>当前用户数</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${systemStatus.max_users}</div>
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${maxUsers}</div>
                             <div>最大用户数</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: ${systemStatus.registration_enabled ? '#28a745' : '#dc3545'};">
-                                ${systemStatus.registration_enabled ? '开启' : '关闭'}
+                            <div style="font-size: 1.5em; font-weight: bold; color: ${registrationEnabled ? '#28a745' : '#dc3545'};">
+                                ${registrationEnabled ? '开启' : '关闭'}
                             </div>
                             <div>注册状态</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: ${systemStatus.maintenance_mode ? '#ffc107' : '#28a745'};">
-                                ${systemStatus.maintenance_mode ? '维护中' : '正常'}
+                            <div style="font-size: 1.5em; font-weight: bold; color: ${maintenanceMode ? '#ffc107' : '#28a745'};">
+                                ${maintenanceMode ? '维护中' : '正常'}
                             </div>
                             <div>系统状态</div>
                         </div>
@@ -2165,6 +2912,962 @@
                 }
             });
         }
+
+        // 日期格式化函数
+        function formatDate(dateString) {
+            if (!dateString) return '未知时间';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (error) {
+                return '时间格式错误';
+            }
+        }
+
+        // ===================
+        // 🔍 搜索功能相关函数
+        // ===================
+        
+        // 设置搜索事件监听器
+        function setupSearchEventListeners() {
+            const searchQuery = document.getElementById('searchQuery');
+            
+            // 页面加载时显示所有图片
+            performSearch();
+            
+            // 实时搜索建议
+            searchQuery.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                const query = this.value.trim();
+                
+                if (query.length >= 2) {
+                    searchTimeout = setTimeout(() => {
+                        loadSearchSuggestions(query);
+                    }, 300); // 300ms防抖
+                } else {
+                    document.getElementById('searchSuggestions').style.display = 'none';
+                }
+            });
+            
+            // 回车搜索
+            searchQuery.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('searchSuggestions').style.display = 'none';
+                    performSearch();
+                }
+            });
+            
+            // 点击其他地方关闭建议
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#searchQuery') && !e.target.closest('#searchSuggestions')) {
+                    document.getElementById('searchSuggestions').style.display = 'none';
+                }
+            });
+        }
+        
+        // 执行搜索
+        async function performSearch(page = 1) {
+            try {
+                const query = document.getElementById('searchQuery').value.trim();
+                const category = document.getElementById('searchCategory').value;
+                const orientation = document.getElementById('searchOrientation').value;
+                const type = document.getElementById('searchType').value;
+                const sort = document.getElementById('searchSort').value;
+                const limit = document.getElementById('searchLimit').value;
+                
+                // 构建搜索参数
+                const params = new URLSearchParams({
+                    page: page,
+                    limit: limit,
+                    sort: sort
+                });
+                
+                if (query) params.append('query', query);
+                if (category) params.append('category', category);
+                if (orientation) params.append('orientation', orientation);
+                if (type) params.append('type', type);
+                
+                const response = await fetch(`/api/search?${params}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    searchCurrentPage = page;
+                    searchTotalPages = result.pagination.totalPages;
+                    searchCurrentQuery = query;
+                    
+                    displaySearchResults(result.data, result.pagination, result.meta);
+                    updateSearchPagination(result.pagination);
+                } else {
+                    showAlert(result.message || '搜索失败', 'error');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                showAlert('搜索时发生错误', 'error');
+            }
+        }
+        
+        // 显示搜索结果
+        function displaySearchResults(images, pagination, meta) {
+            const resultsContainer = document.getElementById('searchResults');
+            const statsContainer = document.getElementById('searchStats');
+            const countElement = document.getElementById('searchResultCount');
+            
+            // 显示统计信息
+            statsContainer.style.display = 'block';
+            countElement.textContent = `找到 ${pagination.total} 张图片 (第 ${pagination.page}/${pagination.totalPages} 页)`;
+            
+            // 调试信息
+            console.log('搜索结果:', { images, pagination, meta });
+            
+            if (images.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                        <h3>没有找到匹配的图片</h3>
+                        <p>尝试使用不同的关键词或筛选条件</p>
+                        <p style="margin-top: 10px; font-size: 14px; color: #999;">
+                            提示: 如果是首次使用，请先在"上传图片"或"管理图片"页面添加一些图片
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 生成搜索结果HTML
+            let html = '<div class="image-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px;">';
+            
+            images.forEach((image, index) => {
+                console.log(`处理图片 ${index + 1}:`, image);
+                
+                const imageUrl = image.is_local ? `/api/images/${image.id}` : image.url;
+                const thumbnailUrl = image.thumbnail_url || imageUrl;
+                const typeLabel = image.is_local ? '本地' : '链接';
+                const typeClass = image.is_local ? 'local' : 'url';
+                
+                html += `
+                    <div class="image-item" style="background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s; cursor: pointer; position: relative;"
+                         onmouseover="this.style.transform='translateY(-5px)'" 
+                         onmouseout="this.style.transform='translateY(0)'">
+                        <!-- 选择框 -->
+                        <div style="position: absolute; top: 8px; left: 8px; z-index: 100;">
+                            <input type="checkbox" class="image-checkbox" data-image-id="${image.id}" 
+                                   onchange="updateBatchSelection()" 
+                                   style="transform: scale(1.3); accent-color: #667eea;">
+                        </div>
+                        
+                        <div style="position: relative;">
+                            <img src="${thumbnailUrl}" alt="${image.original_name || '图片'}" 
+                                 style="width: 100%; height: 150px; object-fit: cover; cursor: pointer;"
+                                 onclick="window.open('${imageUrl}', '_blank')"
+                                 onerror="this.src='${imageUrl}'; console.error('缩略图加载失败，使用原图:', '${thumbnailUrl}');"
+                                 onload="console.log('图片加载成功:', '${thumbnailUrl}');">
+                            <div style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                                ${typeLabel}
+                            </div>
+                            <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px;">
+                                ID: ${image.id}
+                            </div>
+                        </div>
+                        <div style="padding: 15px;">
+                            <div style="font-weight: bold; margin-bottom: 8px; color: #333; word-break: break-all;">${image.original_name || image.filename || '未知文件'}</div>
+                            <div style="color: #666; font-size: 14px; margin-bottom: 4px;">分类: ${image.category || '未分类'}</div>
+                            <div style="color: #666; font-size: 14px; margin-bottom: 8px;">方向: ${image.orientation === 'landscape' ? '横向' : '纵向'}</div>
+                            <div style="color: #999; font-size: 12px;">${formatDate(image.created_at)}</div>
+                            <div style="margin-top: 8px; display: flex; gap: 5px; flex-wrap: wrap;">
+                                <button onclick="copyImageUrl('${imageUrl}')" style="padding: 4px 8px; font-size: 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">复制链接</button>
+                                <button onclick="previewImage('${imageUrl}', '${image.original_name || image.filename}')" style="padding: 4px 8px; font-size: 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">预览</button>
+                                <button onclick="editImage(${image.id}, '${image.original_name || image.filename}')" style="padding: 4px 8px; font-size: 12px; background: #ffc107; color: #212529; border: none; border-radius: 4px; cursor: pointer;">编辑</button>
+                                <button onclick="deleteImageFromSearch(${image.id}, '${image.original_name || image.filename}')" style="padding: 4px 8px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            resultsContainer.innerHTML = html;
+        }
+        
+        // 更新搜索分页
+        function updateSearchPagination(pagination) {
+            const paginationContainer = document.getElementById('searchPagination');
+            
+            if (pagination.totalPages <= 1) {
+                paginationContainer.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div class="pagination" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0;">';
+            
+            // 上一页
+            if (pagination.hasPrev) {
+                html += `<button onclick="performSearch(${pagination.page - 1})" style="padding: 8px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">上一页</button>`;
+            }
+            
+            // 页码按钮
+            const startPage = Math.max(1, pagination.page - 2);
+            const endPage = Math.min(pagination.totalPages, pagination.page + 2);
+            
+            if (startPage > 1) {
+                html += `<button onclick="performSearch(1)" style="padding: 8px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">1</button>`;
+                if (startPage > 2) {
+                    html += '<span style="padding: 8px;">...</span>';
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === pagination.page;
+                const buttonStyle = isActive ? 
+                    'padding: 8px 12px; border: 1px solid #667eea; background: #667eea; color: white; border-radius: 4px; cursor: pointer;' :
+                    'padding: 8px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;';
+                
+                html += `<button onclick="performSearch(${i})" style="${buttonStyle}">${i}</button>`;
+            }
+            
+            if (endPage < pagination.totalPages) {
+                if (endPage < pagination.totalPages - 1) {
+                    html += '<span style="padding: 8px;">...</span>';
+                }
+                html += `<button onclick="performSearch(${pagination.totalPages})" style="padding: 8px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">${pagination.totalPages}</button>`;
+            }
+            
+            // 下一页
+            if (pagination.hasNext) {
+                html += `<button onclick="performSearch(${pagination.page + 1})" style="padding: 8px 12px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">下一页</button>`;
+            }
+            
+            html += '</div>';
+            paginationContainer.innerHTML = html;
+        }
+        
+        // 加载搜索建议
+        async function loadSearchSuggestions(query) {
+            try {
+                const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}&limit=5`);
+                const result = await response.json();
+                
+                if (result.success && result.data.length > 0) {
+                    const suggestionsContainer = document.getElementById('searchSuggestions');
+                    
+                    let html = '';
+                    result.data.forEach(suggestion => {
+                        const icon = suggestion.type === 'category' ? '🏷️' : '📁';
+                        html += `
+                            <div onclick="selectSuggestion('${suggestion.text}')" 
+                                 style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px;"
+                                 onmouseover="this.style.background='#f5f5f5'" 
+                                 onmouseout="this.style.background='white'">
+                                <span>${icon}</span>
+                                <span>${suggestion.text}</span>
+                                <small style="margin-left: auto; color: #999;">${suggestion.type === 'category' ? '分类' : '文件名'}</small>
+                            </div>
+                        `;
+                    });
+                    
+                    suggestionsContainer.innerHTML = html;
+                    suggestionsContainer.style.display = 'block';
+                } else {
+                    document.getElementById('searchSuggestions').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Load suggestions error:', error);
+            }
+        }
+        
+        // 选择搜索建议
+        function selectSuggestion(text) {
+            document.getElementById('searchQuery').value = text;
+            document.getElementById('searchSuggestions').style.display = 'none';
+            performSearch();
+        }
+        
+        
+        // 显示所有图片
+        function showAllImages() {
+            // 清空所有搜索条件
+            document.getElementById('searchQuery').value = '';
+            document.getElementById('searchCategory').value = '';
+            document.getElementById('searchOrientation').value = '';
+            document.getElementById('searchType').value = '';
+            document.getElementById('searchSort').value = 'newest';
+            document.getElementById('searchLimit').value = '12';
+            
+            // 执行空搜索，显示所有图片
+            performSearch();
+        }
+
+        // 复制图片链接
+        function copyImageUrl(url) {
+            navigator.clipboard.writeText(window.location.origin + url).then(() => {
+                showAlert('图片链接已复制到剪贴板', 'success');
+            }).catch(() => {
+                // 备用方法
+                const textArea = document.createElement('textarea');
+                textArea.value = window.location.origin + url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showAlert('图片链接已复制到剪贴板', 'success');
+            });
+        }
+
+        // 预览图片
+        function previewImage(url, title) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.8); z-index: 10000; display: flex; 
+                align-items: center; justify-content: center; cursor: pointer;
+            `;
+            
+            modal.innerHTML = `
+                <div style="position: relative; max-width: 90%; max-height: 90%; text-align: center;">
+                    <img src="${url}" alt="${title}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
+                    <div style="position: absolute; top: -40px; left: 0; right: 0; color: white; font-size: 16px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                        ${title}
+                    </div>
+                    <div style="position: absolute; top: -40px; right: 0; color: white; font-size: 24px; cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); border-radius: 50%;">
+                        ×
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = () => document.body.removeChild(modal);
+            document.body.appendChild(modal);
+        }
+
+        // 从搜索结果删除图片
+        async function deleteImageFromSearch(imageId, imageName) {
+            if (!confirm(`确定要删除图片 "${imageName}" 吗？\n\n此操作不可撤销！`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/images/${imageId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`图片 "${imageName}" 删除成功`, 'success');
+                    // 重新执行搜索以刷新结果
+                    performSearch(searchCurrentPage);
+                } else {
+                    showAlert(`删除失败: ${result.error || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                console.error('删除图片错误:', error);
+                showAlert('删除图片时发生网络错误', 'error');
+            }
+        }
+
+        // 编辑图片信息
+        function editImage(imageId, imageName) {
+            // 创建编辑模态框
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); z-index: 10000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 90%; overflow-y: auto;">
+                    <h3 style="margin-top: 0; color: #333;">编辑图片信息</h3>
+                    <p style="color: #666; margin-bottom: 20px;">图片: ${imageName}</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">分类:</label>
+                        <select id="editCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="landscape">风景</option>
+                            <option value="anime">动漫</option>
+                            <option value="beauty">美女</option>
+                            <option value="nature">自然</option>
+                            <option value="city">城市</option>
+                            <option value="art">艺术</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">方向:</label>
+                        <select id="editOrientation" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="landscape">横向</option>
+                            <option value="portrait">纵向</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">新URL (仅限URL类型图片):</label>
+                        <input type="url" id="editUrl" placeholder="https://example.com/image.jpg" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #999;">留空则不修改URL</small>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="closeEditModal()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                        <button onclick="saveImageEdit(${imageId})" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+            
+            document.body.appendChild(modal);
+            
+            // 加载当前图片信息
+            loadImageForEdit(imageId);
+        }
+
+        // 加载图片信息进行编辑
+        async function loadImageForEdit(imageId) {
+            try {
+                // 从当前搜索结果中找到图片信息
+                const images = document.querySelectorAll('.image-item');
+                // 这里可以通过API获取详细信息，但为了简化，我们使用一些默认值
+                // 实际应用中应该调用 GET /api/images/{id} 获取详细信息
+            } catch (error) {
+                console.error('加载图片信息失败:', error);
+            }
+        }
+
+        // 关闭编辑模态框
+        function closeEditModal() {
+            const modals = document.querySelectorAll('[style*="position: fixed"]');
+            modals.forEach(modal => {
+                if (modal.innerHTML.includes('编辑图片信息')) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+
+        // 保存图片编辑
+        async function saveImageEdit(imageId) {
+            try {
+                const category = document.getElementById('editCategory').value;
+                const orientation = document.getElementById('editOrientation').value;
+                const url = document.getElementById('editUrl').value.trim();
+
+                const formData = new FormData();
+                formData.append('category', category);
+                formData.append('orientation', orientation);
+                if (url) {
+                    formData.append('url', url);
+                }
+
+                const response = await fetch(`/api/images/${imageId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('图片信息更新成功', 'success');
+                    closeEditModal();
+                    // 重新执行搜索以刷新结果
+                    performSearch(searchCurrentPage);
+                } else {
+                    showAlert(`更新失败: ${result.error || '未知错误'}`, 'error');
+                }
+            } catch (error) {
+                console.error('保存图片编辑错误:', error);
+                showAlert('保存图片信息时发生网络错误', 'error');
+            }
+        }
+
+        // 批量删除功能
+        function showBatchDeleteOptions() {
+            const selectedImages = document.querySelectorAll('.image-item input[type="checkbox"]:checked');
+            if (selectedImages.length === 0) {
+                showAlert('请先选择要删除的图片', 'error');
+                return;
+            }
+
+            if (confirm(`确定要删除选中的 ${selectedImages.length} 张图片吗？\n\n此操作不可撤销！`)) {
+                batchDeleteImages(selectedImages);
+            }
+        }
+
+        // 执行批量删除
+        async function batchDeleteImages(selectedImages) {
+            const deletePromises = [];
+            const imageIds = [];
+
+            selectedImages.forEach(checkbox => {
+                const imageId = checkbox.dataset.imageId;
+                if (imageId) {
+                    imageIds.push(imageId);
+                    deletePromises.push(
+                        fetch(`/api/images/${imageId}`, { method: 'DELETE' })
+                    );
+                }
+            });
+
+            try {
+                const results = await Promise.all(deletePromises);
+                let successCount = 0;
+                let failCount = 0;
+
+                results.forEach(response => {
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                });
+
+                if (failCount === 0) {
+                    showAlert(`成功删除 ${successCount} 张图片`, 'success');
+                } else {
+                    showAlert(`删除完成: 成功 ${successCount} 张，失败 ${failCount} 张`, 'error');
+                }
+
+                // 重新执行搜索以刷新结果
+                performSearch(searchCurrentPage);
+            } catch (error) {
+                console.error('批量删除错误:', error);
+                showAlert('批量删除时发生网络错误', 'error');
+            }
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllImages');
+            const imageCheckboxes = document.querySelectorAll('.image-checkbox');
+            
+            imageCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateBatchSelection();
+        }
+
+        // 更新批量选择状态
+        function updateBatchSelection() {
+            const selectedCheckboxes = document.querySelectorAll('.image-checkbox:checked');
+            const totalCheckboxes = document.querySelectorAll('.image-checkbox');
+            const selectAllCheckbox = document.getElementById('selectAllImages');
+            const selectedCount = document.getElementById('selectedCount');
+            const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+            const batchEditBtn = document.getElementById('batchEditBtn');
+            
+            // 更新全选状态
+            if (selectedCheckboxes.length === 0) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = false;
+            } else if (selectedCheckboxes.length === totalCheckboxes.length) {
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.indeterminate = true;
+                selectAllCheckbox.checked = false;
+            }
+            
+            // 更新选择计数
+            selectedCount.textContent = `已选择 ${selectedCheckboxes.length} 张图片`;
+            
+            // 更新批量操作按钮状态
+            const hasSelection = selectedCheckboxes.length > 0;
+            batchDeleteBtn.disabled = !hasSelection;
+            batchEditBtn.disabled = !hasSelection;
+            
+            if (hasSelection) {
+                batchDeleteBtn.style.opacity = '1';
+                batchEditBtn.style.opacity = '1';
+                batchDeleteBtn.style.cursor = 'pointer';
+                batchEditBtn.style.cursor = 'pointer';
+            } else {
+                batchDeleteBtn.style.opacity = '0.5';
+                batchEditBtn.style.opacity = '0.5';
+                batchDeleteBtn.style.cursor = 'not-allowed';
+                batchEditBtn.style.cursor = 'not-allowed';
+            }
+        }
+
+        // 批量编辑功能
+        function showBatchEditOptions() {
+            const selectedCheckboxes = document.querySelectorAll('.image-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                showAlert('请先选择要编辑的图片', 'error');
+                return;
+            }
+
+            // 创建批量编辑模态框
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); z-index: 10000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 90%; overflow-y: auto;">
+                    <h3 style="margin-top: 0; color: #333;">批量编辑图片信息</h3>
+                    <p style="color: #666; margin-bottom: 20px;">已选择 ${selectedCheckboxes.length} 张图片</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">
+                            <input type="checkbox" id="batchEditCategory" onchange="toggleBatchEditField('Category')"> 批量修改分类
+                        </label>
+                        <select id="batchCategory" disabled style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="landscape">风景</option>
+                            <option value="anime">动漫</option>
+                            <option value="beauty">美女</option>
+                            <option value="nature">自然</option>
+                            <option value="city">城市</option>
+                            <option value="art">艺术</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">
+                            <input type="checkbox" id="batchEditOrientation" onchange="toggleBatchEditField('Orientation')"> 批量修改方向
+                        </label>
+                        <select id="batchOrientation" disabled style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="landscape">横向</option>
+                            <option value="portrait">纵向</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="closeBatchEditModal()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                        <button onclick="saveBatchEdit()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">保存修改</button>
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+            
+            document.body.appendChild(modal);
+        }
+
+        // 切换批量编辑字段
+        function toggleBatchEditField(fieldName) {
+            const checkbox = document.getElementById(`batchEdit${fieldName}`);
+            const field = document.getElementById(`batch${fieldName}`);
+            field.disabled = !checkbox.checked;
+            if (checkbox.checked) {
+                field.style.opacity = '1';
+                field.style.cursor = 'pointer';
+            } else {
+                field.style.opacity = '0.5';
+                field.style.cursor = 'not-allowed';
+            }
+        }
+
+        // 关闭批量编辑模态框
+        function closeBatchEditModal() {
+            const modals = document.querySelectorAll('[style*="position: fixed"]');
+            modals.forEach(modal => {
+                if (modal.innerHTML.includes('批量编辑图片信息')) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+
+        // 保存批量编辑
+        async function saveBatchEdit() {
+            try {
+                const selectedCheckboxes = document.querySelectorAll('.image-checkbox:checked');
+                const editCategory = document.getElementById('batchEditCategory').checked;
+                const editOrientation = document.getElementById('batchEditOrientation').checked;
+                
+                if (!editCategory && !editOrientation) {
+                    showAlert('请至少选择一个要修改的字段', 'error');
+                    return;
+                }
+                
+                const updates = [];
+                selectedCheckboxes.forEach(checkbox => {
+                    const imageId = checkbox.dataset.imageId;
+                    if (imageId) {
+                        const formData = new FormData();
+                        
+                        if (editCategory) {
+                            formData.append('category', document.getElementById('batchCategory').value);
+                        }
+                        if (editOrientation) {
+                            formData.append('orientation', document.getElementById('batchOrientation').value);
+                        }
+                        
+                        updates.push(
+                            fetch(`/api/images/${imageId}`, {
+                                method: 'PUT',
+                                body: formData
+                            })
+                        );
+                    }
+                });
+
+                const results = await Promise.all(updates);
+                let successCount = 0;
+                let failCount = 0;
+
+                results.forEach(response => {
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                });
+
+                if (failCount === 0) {
+                    showAlert(`成功更新 ${successCount} 张图片`, 'success');
+                } else {
+                    showAlert(`更新完成: 成功 ${successCount} 张，失败 ${failCount} 张`, 'error');
+                }
+
+                closeBatchEditModal();
+                // 重新执行搜索以刷新结果
+                performSearch(searchCurrentPage);
+            } catch (error) {
+                console.error('批量编辑错误:', error);
+                showAlert('批量编辑时发生网络错误', 'error');
+            }
+        }
+
+        // 强制更新统计信息
+        async function forceUpdateStats() {
+            console.log('🔄 强制刷新统计信息...');
+            
+            // 显示加载状态
+            document.getElementById('totalImages').textContent = '...';
+            document.getElementById('landscapeImages').textContent = '...';
+            document.getElementById('portraitImages').textContent = '...';
+            document.getElementById('categories').textContent = '...';
+            
+            try {
+                // 优先使用stats API
+                const response = await fetch('/api/stats?_t=' + Date.now()); // 添加时间戳避免缓存
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const stats = result.data;
+                    document.getElementById('totalImages').textContent = stats.total || 0;
+                    document.getElementById('landscapeImages').textContent = stats.landscape || 0;
+                    document.getElementById('portraitImages').textContent = stats.portrait || 0;
+                    document.getElementById('categories').textContent = stats.categories || 0;
+                    
+                    console.log('✅ 统计信息刷新成功:', stats);
+                    showAlert('统计信息已刷新', 'success');
+                } else {
+                    throw new Error('Stats API 响应格式错误');
+                }
+            } catch (error) {
+                console.error('❌ Stats API 失败，回退到图片列表API:', error);
+                
+                try {
+                    // 回退到完整图片列表API
+                    const response = await fetch('/api/images?paginated=false&_t=' + Date.now());
+                    const result = await response.json();
+                    
+                    const images = result.success ? result.data : (Array.isArray(result) ? result : []);
+                    
+                    const total = images.length;
+                    const landscape = images.filter(img => img.orientation === 'landscape').length;
+                    const portrait = images.filter(img => img.orientation === 'portrait').length;
+                    const categories = new Set(images.map(img => img.category)).size;
+                    
+                    document.getElementById('totalImages').textContent = total;
+                    document.getElementById('landscapeImages').textContent = landscape;
+                    document.getElementById('portraitImages').textContent = portrait;
+                    document.getElementById('categories').textContent = categories;
+                    
+                    console.log('✅ 统计信息刷新成功 (回退方法):', {total, landscape, portrait, categories});
+                    showAlert('统计信息已刷新', 'success');
+                } catch (fallbackError) {
+                    console.error('❌ 所有方法都失败:', fallbackError);
+                    
+                    // 设置错误状态
+                    document.getElementById('totalImages').textContent = '错误';
+                    document.getElementById('landscapeImages').textContent = '错误';
+                    document.getElementById('portraitImages').textContent = '错误';
+                    document.getElementById('categories').textContent = '错误';
+                    
+                    showAlert('刷新统计信息失败', 'error');
+                }
+            }
+        }
+
+        // IP管理相关函数
+        async function refreshBlockedIPs() {
+            try {
+                const response = await fetch('/admin/blocked-ips');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const blockedIPs = result.data;
+                    const count = blockedIPs.blocked.length + blockedIPs.suspicious.length;
+                    
+                    document.getElementById('blockedIPCount').textContent = count;
+                    
+                    let html = '';
+                    if (count === 0) {
+                        html = '<div style="text-align: center; color: #28a745; padding: 20px;">✅ 当前没有被限制的IP地址</div>';
+                    } else {
+                        html = '<div style="margin-bottom: 15px;">';
+                        
+                        if (blockedIPs.blocked.length > 0) {
+                            html += `<h5 style="color: #dc3545;">🚫 被封禁的IP (${blockedIPs.blocked.length}):</h5>`;
+                            html += '<div style="background: #f8d7da; padding: 10px; border-radius: 5px; margin-bottom: 10px;">';
+                            blockedIPs.blocked.forEach(ip => {
+                                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin: 5px 0;">
+                                    <span><code>${ip}</code></span>
+                                    <button class="btn btn-sm btn-danger" onclick="unblockIP('${ip}')">解除</button>
+                                </div>`;
+                            });
+                            html += '</div>';
+                        }
+                        
+                        if (blockedIPs.suspicious.length > 0) {
+                            html += `<h5 style="color: #ffc107;">⚠️ 可疑IP (${blockedIPs.suspicious.length}):</h5>`;
+                            html += '<div style="background: #fff3cd; padding: 10px; border-radius: 5px;">';
+                            blockedIPs.suspicious.forEach(ip => {
+                                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin: 5px 0;">
+                                    <span><code>${ip}</code></span>
+                                    <button class="btn btn-sm btn-warning" onclick="unblockIP('${ip}')">清除</button>
+                                </div>`;
+                            });
+                            html += '</div>';
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    document.getElementById('blockedIPsList').innerHTML = html;
+                } else {
+                    throw new Error(result.message || '获取IP限制列表失败');
+                }
+            } catch (error) {
+                console.error('刷新IP列表错误:', error);
+                document.getElementById('blockedIPsList').innerHTML = 
+                    '<div style="color: #dc3545; text-align: center; padding: 20px;">❌ 获取IP限制列表失败</div>';
+            }
+        }
+
+        async function clearAllIPRestrictions() {
+            if (!confirm('确定要清除所有IP限制吗？这将解除所有被限制的IP地址的访问限制。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/admin/clear-ip-restrictions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(`成功清除所有IP限制！解除了 ${result.data.clearedBlocked} 个被封禁IP，${result.data.clearedSuspicious || 0} 个可疑IP`, 'success');
+                    refreshBlockedIPs(); // 刷新列表
+                } else {
+                    throw new Error(result.message || '清除IP限制失败');
+                }
+            } catch (error) {
+                console.error('清除IP限制错误:', error);
+                showAlert('清除IP限制失败: ' + error.message, 'error');
+            }
+        }
+
+        async function unblockIP(ip) {
+            if (!confirm(`确定要解除IP地址 ${ip} 的访问限制吗？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/blocked-ips/${encodeURIComponent(ip)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert(`成功解除IP ${ip} 的访问限制`, 'success');
+                    refreshBlockedIPs(); // 刷新列表
+                } else {
+                    throw new Error(result.message || '解除IP限制失败');
+                }
+            } catch (error) {
+                console.error('解除IP限制错误:', error);
+                showAlert('解除IP限制失败: ' + error.message, 'error');
+            }
+        }
+
+        async function emergencyClearIP() {
+            if (!confirm('这是紧急操作！确定要立即清除所有IP限制吗？\n\n这将：\n- 清除所有被封禁的IP\n- 清除所有可疑IP记录\n- 重置所有安全计数器')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/admin/emergency-clear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ emergencyKey: 'emergency-clear-2024' })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('🚨 紧急清除完成！所有IP限制已解除', 'success');
+                    refreshBlockedIPs(); // 刷新列表
+                } else {
+                    throw new Error(result.message || '紧急清除失败');
+                }
+            } catch (error) {
+                console.error('紧急清除错误:', error);
+                showAlert('紧急清除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 在安全设置标签激活时加载IP信息
+        function showTab(tabName) {
+            // 隐藏所有标签内容
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // 移除所有标签的active类
+            const tabButtons = document.querySelectorAll('.tab');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // 显示选中的标签内容
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // 激活对应的标签按钮
+            event.target.classList.add('active');
+            
+            // 根据不同标签加载对应内容
+            if (tabName === 'manage') {
+                loadImages();
+            } else if (tabName === 'users') {
+                loadUsers();
+            } else if (tabName === 'security') {
+                loadAccessRules();
+                refreshBlockedIPs(); // 加载IP限制信息
+                loadCurrentUserEmail(); // 加载当前用户邮箱
+            } else if (tabName === 'system') {
+                loadSystemInfo();
+            }
+        }
+
     </script>
 </body>
 </html>

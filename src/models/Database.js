@@ -29,9 +29,11 @@ class Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        email TEXT,
-        role TEXT DEFAULT 'admin',
+        email TEXT UNIQUE,
+        role TEXT DEFAULT 'user',
+        permissions TEXT DEFAULT '["view_images", "upload_images"]',
         is_active INTEGER DEFAULT 1,
+        email_verified INTEGER DEFAULT 0,
         last_login DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -70,6 +72,32 @@ class Database {
         expires_at DATETIME NOT NULL,
         used INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    `;
+
+    const createEmailVerificationTableQuery = `
+      CREATE TABLE IF NOT EXISTS email_verification (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        verified INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    `;
+
+    const createUserProfileTableQuery = `
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE NOT NULL,
+        display_name TEXT,
+        avatar_url TEXT,
+        bio TEXT,
+        preferences TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )
     `;
@@ -127,6 +155,8 @@ class Database {
       this.db.run(createAccessControlTableQuery);
       this.db.run(createSessionsTableQuery);
       this.db.run(createPasswordResetsTableQuery);
+      this.db.run(createEmailVerificationTableQuery);
+      this.db.run(createUserProfileTableQuery);
       this.db.run(createApiStatsTableQuery);
       this.db.run(createDailyStatsTableQuery);
       this.db.run(createSystemConfigTableQuery);
@@ -144,6 +174,35 @@ class Database {
             }
           });
         }
+      }
+    });
+
+    // 检查并添加用户表的新字段（兼容旧数据库）
+    this.db.all("PRAGMA table_info(users)", (err, columns) => {
+      if (!err && columns) {
+        const columnNames = columns.map(col => col.name);
+        
+        // 检查并添加缺失的列
+        const requiredColumns = [
+          { name: 'permissions', type: 'TEXT', default: '\'["view_images", "upload_images"]\'' },
+          { name: 'is_active', type: 'INTEGER', default: '1' },
+          { name: 'email_verified', type: 'INTEGER', default: '0' },
+          { name: 'last_login', type: 'DATETIME', default: 'NULL' },
+          { name: 'updated_at', type: 'DATETIME', default: 'CURRENT_TIMESTAMP' }
+        ];
+
+        requiredColumns.forEach(column => {
+          if (!columnNames.includes(column.name)) {
+            const sql = `ALTER TABLE users ADD COLUMN ${column.name} ${column.type} DEFAULT ${column.default}`;
+            this.db.run(sql, (alterErr) => {
+              if (alterErr) {
+                console.error(`Error adding ${column.name} column:`, alterErr);
+              } else {
+                console.log(`${column.name} column added to users table`);
+              }
+            });
+          }
+        });
       }
     });
       
@@ -232,7 +291,10 @@ class Database {
       
       // 用户表索引
       "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+      "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+      "CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)",
       "CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active)",
+      "CREATE INDEX IF NOT EXISTS idx_users_email_verified ON users(email_verified)",
       
       // 访问控制表索引
       "CREATE INDEX IF NOT EXISTS idx_access_control_type ON access_control(type)",
@@ -256,7 +318,20 @@ class Database {
       
       // 系统配置表索引
       "CREATE INDEX IF NOT EXISTS idx_system_config_key ON system_config(config_key)",
-      "CREATE INDEX IF NOT EXISTS idx_system_config_updated_by ON system_config(updated_by)"
+      "CREATE INDEX IF NOT EXISTS idx_system_config_updated_by ON system_config(updated_by)",
+      
+      // 邮箱验证表索引
+      "CREATE INDEX IF NOT EXISTS idx_email_verification_user_id ON email_verification(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_email_verification_token ON email_verification(token)",
+      "CREATE INDEX IF NOT EXISTS idx_email_verification_expires_at ON email_verification(expires_at)",
+      
+      // 密码重置表索引  
+      "CREATE INDEX IF NOT EXISTS idx_password_resets_user_id ON password_resets(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token)",
+      "CREATE INDEX IF NOT EXISTS idx_password_resets_expires_at ON password_resets(expires_at)",
+      
+      // 用户配置表索引
+      "CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id)"
     ];
     
     indexes.forEach(indexSql => {
@@ -892,25 +967,252 @@ class Database {
     });
   }
 
+  // 通用查询方法
+  query(sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, params, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
   // User Management Methods
   async createUser(userData) {
     return new Promise(async (resolve, reject) => {
       try {
-        const { username, password, email, role = 'admin', is_active = 1 } = userData;
+        const { 
+          username, 
+          password, 
+          email, 
+          role = 'user',  // 默认为普通用户，不是管理员
+          permissions = '["view_images", "upload_images"]',
+          is_active = 1 
+        } = userData;
+        
         const hashedPassword = await bcrypt.hash(password, 10);
         
         const query = `
-          INSERT INTO users (username, password, email, role, is_active)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO users (username, password, email, role, permissions, is_active)
+          VALUES (?, ?, ?, ?, ?, ?)
         `;
         
-        this.db.run(query, [username, hashedPassword, email, role, is_active], function(err) {
+        this.db.run(query, [username, hashedPassword, email, role, permissions, is_active], function(err) {
           if (err) {
             reject(err);
           } else {
-            resolve({ id: this.lastID, username, email, role, is_active });
+            resolve({ id: this.lastID, username, email, role, permissions, is_active });
           }
         });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 注册新用户（公开注册，只给普通用户权限）
+  async registerUser(userData) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const { username, password, email } = userData;
+        
+        // 检查用户名是否已存在
+        const existingUsername = await this.getUserByUsername(username);
+        if (existingUsername) {
+          return reject(new Error('用户名已存在'));
+        }
+        
+        // 检查邮箱是否已存在
+        if (email) {
+          const existingEmail = await this.getUserByEmail(email);
+          if (existingEmail) {
+            return reject(new Error('邮箱已被使用'));
+          }
+        }
+        
+        // 创建普通用户（不给管理员权限）
+        const userPermissions = JSON.stringify(['view_images', 'upload_images']);
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        const query = `
+          INSERT INTO users (username, password, email, role, permissions, is_active, email_verified)
+          VALUES (?, ?, ?, 'user', ?, 1, 0)
+        `;
+        
+        this.db.run(query, [username, hashedPassword, email, userPermissions], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ 
+              id: this.lastID, 
+              username, 
+              email, 
+              role: 'user', 
+              permissions: JSON.parse(userPermissions),
+              email_verified: false
+            });
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 获取用户通过邮箱
+  getUserByEmail(email) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM users WHERE email = ? AND is_active = 1', [email], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  // 更新用户邮箱
+  async updateUserEmail(userId, newEmail) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // 检查新邮箱是否已被使用
+        const existingUser = await this.getUserByEmail(newEmail);
+        if (existingUser && existingUser.id !== userId) {
+          return reject(new Error('该邮箱已被其他用户使用'));
+        }
+        
+        const query = `
+          UPDATE users 
+          SET email = ?, email_verified = 0, updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ?
+        `;
+        
+        this.db.run(query, [newEmail, userId], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ 
+              updated: this.changes > 0, 
+              message: '邮箱更新成功，请重新验证' 
+            });
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 更新用户信息
+  async updateUser(userId, updateData) {
+    return new Promise((resolve, reject) => {
+      const allowedFields = ['email', 'role', 'permissions', 'is_active'];
+      const updates = [];
+      const values = [];
+      
+      Object.keys(updateData).forEach(key => {
+        if (allowedFields.includes(key)) {
+          updates.push(`${key} = ?`);
+          values.push(updateData[key]);
+        }
+      });
+      
+      if (updates.length === 0) {
+        return reject(new Error('没有可更新的字段'));
+      }
+      
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      values.push(userId);
+      
+      const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+      
+      this.db.run(query, values, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ updated: this.changes > 0 });
+        }
+      });
+    });
+  }
+
+  // 创建用户配置文件
+  async createUserProfile(userId, profileData) {
+    return new Promise((resolve, reject) => {
+      const { display_name, avatar_url, bio, preferences = '{}' } = profileData;
+      
+      const query = `
+        INSERT INTO user_profiles (user_id, display_name, avatar_url, bio, preferences)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          display_name = excluded.display_name,
+          avatar_url = excluded.avatar_url,
+          bio = excluded.bio,
+          preferences = excluded.preferences,
+          updated_at = CURRENT_TIMESTAMP
+      `;
+      
+      this.db.run(query, [userId, display_name, avatar_url, bio, preferences], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ id: this.lastID || userId, updated: true });
+        }
+      });
+    });
+  }
+
+  // 获取用户配置文件
+  getUserProfile(userId) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT u.*, p.display_name, p.avatar_url, p.bio, p.preferences
+        FROM users u
+        LEFT JOIN user_profiles p ON u.id = p.user_id
+        WHERE u.id = ? AND u.is_active = 1
+      `;
+      
+      this.db.get(query, [userId], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (row) {
+            // 解析权限和偏好设置
+            try {
+              row.permissions = JSON.parse(row.permissions || '[]');
+              row.preferences = JSON.parse(row.preferences || '{}');
+            } catch (e) {
+              row.permissions = [];
+              row.preferences = {};
+            }
+          }
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  // 检查用户权限
+  checkUserPermission(userId, permission) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const user = await this.getUserById(userId);
+        if (!user) {
+          return resolve(false);
+        }
+        
+        // 管理员拥有所有权限
+        if (user.role === 'admin') {
+          return resolve(true);
+        }
+        
+        // 检查用户特定权限
+        const permissions = JSON.parse(user.permissions || '[]');
+        resolve(permissions.includes(permission));
       } catch (error) {
         reject(error);
       }
@@ -998,14 +1300,91 @@ class Database {
     });
   }
 
-  deleteUser(id) {
+  // 禁用/启用用户（软删除）
+  disableUser(id) {
     return new Promise((resolve, reject) => {
       this.db.run('UPDATE users SET is_active = 0 WHERE id = ?', [id], function(err) {
         if (err) {
           reject(err);
         } else {
-          resolve({ changes: this.changes });
+          resolve({ changes: this.changes, action: 'disabled' });
         }
+      });
+    });
+  }
+
+  // 启用用户
+  enableUser(id) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE users SET is_active = 1 WHERE id = ?', [id], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ changes: this.changes, action: 'enabled' });
+        }
+      });
+    });
+  }
+
+  // 切换用户状态
+  toggleUserStatus(id) {
+    return new Promise((resolve, reject) => {
+      // 先获取当前状态
+      this.db.get('SELECT is_active FROM users WHERE id = ?', [id], (err, user) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        if (!user) {
+          reject(new Error('用户不存在'));
+          return;
+        }
+
+        const newStatus = user.is_active === 1 ? 0 : 1;
+        const action = newStatus === 1 ? 'enabled' : 'disabled';
+
+        this.db.run('UPDATE users SET is_active = ? WHERE id = ?', [newStatus, id], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ 
+              changes: this.changes, 
+              action,
+              new_status: newStatus,
+              message: `用户已${action === 'enabled' ? '启用' : '禁用'}`
+            });
+          }
+        });
+      });
+    });
+  }
+
+  // 真正删除用户（硬删除）
+  deleteUser(id) {
+    return new Promise((resolve, reject) => {
+      // 先检查是否是管理员
+      this.db.get('SELECT role FROM users WHERE id = ?', [id], (err, user) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        if (!user) {
+          reject(new Error('用户不存在'));
+          return;
+        }
+        if (user.role === 'admin') {
+          reject(new Error('不能删除管理员账户'));
+          return;
+        }
+
+        // 执行删除
+        this.db.run('DELETE FROM users WHERE id = ?', [id], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ changes: this.changes, action: 'deleted' });
+          }
+        });
       });
     });
   }

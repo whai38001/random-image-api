@@ -262,7 +262,80 @@ router.delete('/users/:id', authenticateSession, async (req, res) => {
     res.json({ success: true, message: '用户删除成功' });
   } catch (error) {
     console.error('Delete user error:', error);
-    res.status(500).json({ error: '删除用户失败' });
+    res.status(500).json({ error: error.message || '删除用户失败' });
+  }
+});
+
+// 切换用户状态（禁用/启用）
+router.patch('/users/:id/toggle-status', authenticateSession, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: '权限不足' });
+    }
+
+    const userId = req.params.id;
+
+    // 不能禁用自己
+    if (parseInt(userId) === req.session.userId) {
+      return res.status(400).json({ error: '不能禁用自己的账户' });
+    }
+
+    const result = await db.toggleUserStatus(userId);
+    res.json({ 
+      success: true, 
+      message: result.message,
+      new_status: result.new_status,
+      action: result.action
+    });
+  } catch (error) {
+    console.error('Toggle user status error:', error);
+    res.status(500).json({ error: error.message || '切换用户状态失败' });
+  }
+});
+
+// 启用用户
+router.patch('/users/:id/enable', authenticateSession, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: '权限不足' });
+    }
+
+    const userId = req.params.id;
+    const result = await db.enableUser(userId);
+    res.json({ 
+      success: true, 
+      message: '用户启用成功',
+      action: result.action
+    });
+  } catch (error) {
+    console.error('Enable user error:', error);
+    res.status(500).json({ error: error.message || '启用用户失败' });
+  }
+});
+
+// 禁用用户
+router.patch('/users/:id/disable', authenticateSession, async (req, res) => {
+  try {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({ error: '权限不足' });
+    }
+
+    const userId = req.params.id;
+
+    // 不能禁用自己
+    if (parseInt(userId) === req.session.userId) {
+      return res.status(400).json({ error: '不能禁用自己的账户' });
+    }
+
+    const result = await db.disableUser(userId);
+    res.json({ 
+      success: true, 
+      message: '用户禁用成功',
+      action: result.action
+    });
+  } catch (error) {
+    console.error('Disable user error:', error);
+    res.status(500).json({ error: error.message || '禁用用户失败' });
   }
 });
 
@@ -653,6 +726,136 @@ router.post('/reset-password', rateLimit({
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({ error: '重置密码失败' });
+  }
+});
+
+// 更新用户邮箱
+router.post('/update-email', authenticateSession, upload.none(), async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+    const userId = req.session.userId;
+
+    if (!newEmail || !currentPassword) {
+      return res.status(400).json({ error: '请提供新邮箱和当前密码' });
+    }
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({ error: '请输入有效的邮箱地址' });
+    }
+
+    // 获取当前用户信息
+    const user = await db.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    // 验证当前密码
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: '当前密码错误' });
+    }
+
+    // 检查新邮箱是否已被使用
+    const existingUser = await db.findUserByEmail(newEmail);
+    if (existingUser && existingUser.id !== userId) {
+      return res.status(400).json({ error: '该邮箱已被其他用户使用' });
+    }
+
+    // 更新邮箱
+    await db.updateUserEmail(userId, newEmail);
+
+    // 发送邮箱变更通知
+    try {
+      const emailResult = await emailService.sendEmailChangeNotification(newEmail, user.username);
+      if (emailResult.success) {
+        console.log(`Email change notification sent to ${newEmail}`);
+      }
+    } catch (emailError) {
+      console.error('Failed to send email change notification:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: '邮箱更新成功，请重新验证邮箱'
+    });
+
+  } catch (error) {
+    console.error('Update email error:', error);
+    res.status(500).json({ error: '更新邮箱失败' });
+  }
+});
+
+// 获取用户个人信息
+router.get('/profile', authenticateSession, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const profile = await db.getUserProfile(userId);
+    
+    if (!profile) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    // 不返回敏感信息
+    const { password, ...safeProfile } = profile;
+    
+    res.json({
+      success: true,
+      user: safeProfile
+    });
+
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: '获取用户信息失败' });
+  }
+});
+
+// 更新用户个人信息
+router.post('/profile', authenticateSession, upload.none(), async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const { display_name, bio, preferences } = req.body;
+
+    // 创建或更新用户配置文件
+    await db.createUserProfile(userId, {
+      display_name,
+      bio,
+      preferences: typeof preferences === 'string' ? preferences : JSON.stringify(preferences || {})
+    });
+
+    res.json({
+      success: true,
+      message: '个人信息更新成功'
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: '更新个人信息失败' });
+  }
+});
+
+// 获取用户权限信息
+router.get('/permissions', authenticateSession, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const user = await db.getUserById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+
+    const permissions = JSON.parse(user.permissions || '[]');
+    
+    res.json({
+      success: true,
+      permissions,
+      role: user.role
+    });
+
+  } catch (error) {
+    console.error('Get permissions error:', error);
+    res.status(500).json({ error: '获取权限信息失败' });
   }
 });
 

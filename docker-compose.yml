@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # 🚀 Random Image API 服务
+  random-image-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: random-image-api
+    restart: unless-stopped
+    
+    # 🌐 网络配置
+    ports:
+      - "${PORT:-3001}:3001"
+    
+    # 📂 数据持久化
+    volumes:
+      - ./config:/app/config:rw
+      - ./public/uploads:/app/public/uploads:rw
+      - app_logs:/app/logs:rw
+    
+    # 🌍 环境变量
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SESSION_SECRET=${SESSION_SECRET:-your-super-secret-key-change-me}
+      - DB_PATH=/app/config/images.db
+      - HTTPS=${HTTPS:-false}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-15}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-1000}
+      - LOGIN_RATE_LIMIT=${LOGIN_RATE_LIMIT:-5}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      
+      # 📧 邮件配置（可选）
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+    
+    # 🏥 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # 🔒 安全配置
+    security_opt:
+      - no-new-privileges:true
+    
+    # 📊 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # 🌐 标签
+    labels:
+      - "com.docker.compose.service=random-image-api"
+      - "version=2.0"
+      - "environment=production"
+
+  # 🔄 Nginx 反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    container_name: random-image-api-nginx
+    restart: unless-stopped
+    
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    
+    depends_on:
+      random-image-api:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    
+    # 仅在需要时启用
+    profiles:
+      - nginx
+
+  # 📊 监控服务（可选）
+  monitoring:
+    image: prom/node-exporter:latest
+    container_name: random-image-api-monitoring
+    restart: unless-stopped
+    
+    ports:
+      - "9100:9100"
+    
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    
+    # 仅在需要时启用
+    profiles:
+      - monitoring
+
+# 📂 数据卷
+volumes:
+  app_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
+  
+  nginx_logs:
+    driver: local
+
+# 🌐 网络
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

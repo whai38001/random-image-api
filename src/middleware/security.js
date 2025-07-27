@@ -254,6 +254,80 @@ class SecurityMiddleware {
       }
     }
   }
+
+  // 清除所有IP限制（管理员功能）
+  clearAllRestrictions() {
+    const blockedCount = this.blockedIPs.size;
+    const suspiciousCount = this.suspiciousIPs.size;
+    
+    this.blockedIPs.clear();
+    this.suspiciousIPs.clear();
+    
+    console.log(`🧹 清除了 ${blockedCount} 个被封禁IP和 ${suspiciousCount} 个可疑IP记录`);
+    
+    return {
+      clearedBlocked: blockedCount,
+      clearedSuspicious: suspiciousCount,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // 清除特定IP的限制
+  clearIPRestriction(ip) {
+    const wasBlocked = this.blockedIPs.has(ip);
+    const wasSuspicious = this.suspiciousIPs.has(ip);
+    
+    this.blockedIPs.delete(ip);
+    this.suspiciousIPs.delete(ip);
+    
+    console.log(`🔓 IP ${ip} 的限制已清除 (被封禁: ${wasBlocked}, 可疑: ${wasSuspicious})`);
+    
+    return {
+      ip,
+      wasBlocked,
+      wasSuspicious,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // 获取所有被限制的IP
+  getBlockedIPs() {
+    return {
+      blocked: Array.from(this.blockedIPs),
+      suspicious: Array.from(this.suspiciousIPs.entries()).map(([ip, data]) => ({
+        ip,
+        count: data.count,
+        lastActivity: new Date(data.lastActivity).toISOString()
+      }))
+    };
+  }
+
+  // 手动添加IP到黑名单
+  blockIP(ip, reason = 'Manual block') {
+    this.blockedIPs.add(ip);
+    console.log(`🚫 手动封禁IP: ${ip}, 原因: ${reason}`);
+    
+    return {
+      ip,
+      reason,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // 检查IP状态
+  getIPStatus(ip) {
+    const isBlocked = this.blockedIPs.has(ip);
+    const suspicious = this.suspiciousIPs.get(ip);
+    
+    return {
+      ip,
+      isBlocked,
+      suspicious: suspicious ? {
+        count: suspicious.count,
+        lastActivity: new Date(suspicious.lastActivity).toISOString()
+      } : null
+    };
+  }
 }
 
 module.exports = SecurityMiddleware;

@@ -1,0 +1,90 @@
+# 🚫 Docker构建忽略文件
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 日志文件
+*.log
+logs/
+server.log*
+
+# 运行时文件
+*.pid
+*.seed
+*.pid.lock
+
+# 数据库文件（保留结构）
+config/images.db*
+
+# 上传文件（保留目录）
+public/uploads/*.jpg
+public/uploads/*.jpeg
+public/uploads/*.png
+public/uploads/*.gif
+public/uploads/*.webp
+public/uploads/thumbnails/*
+
+# 环境变量
+.env*
+!.env.example
+!.env.docker
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git文件
+.git/
+.gitignore
+
+# Docker文件
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试文件
+test/
+tests/
+*.test.js
+*.spec.js
+
+# 文档
+README*.md
+CHANGELOG.md
+LICENSE
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# 包管理器
+package-lock.json
+yarn.lock
+
+# 覆盖率报告
+coverage/
+.nyc_output
+
+# 其他
+.cache
+.parcel-cache

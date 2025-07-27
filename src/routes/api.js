@@ -6,6 +6,8 @@ const sharp = require('sharp');
 const Database = require('../models/Database');
 const ThumbnailService = require('../services/ThumbnailService');
 const FileValidation = require('../utils/fileValidation');
+const ApiResponse = require('../utils/apiResponse');
+const { asyncHandler, ValidationError, NotFoundError } = require('../utils/errorHandler');
 const { authenticateSession } = require('../middleware/auth');
 
 const router = express.Router();
@@ -13,16 +15,11 @@ const db = new Database();
 const thumbnailService = new ThumbnailService();
 const fileValidator = new FileValidation();
 
-// 统计信息端点 - 优化性能
-router.get('/stats', async (req, res) => {
-  try {
-    const stats = await db.getImageStats();
-    res.json(stats);
-  } catch (error) {
-    console.error('Get stats error:', error);
-    res.status(500).json({ error: '获取统计信息失败' });
-  }
-});
+// 统计信息端点 - 使用标准化响应
+router.get('/stats', asyncHandler(async (req, res) => {
+  const stats = await db.getImageStats();
+  return ApiResponse.success(res, stats, '获取统计信息成功');
+}));
 
 // 处理OPTIONS预检请求
 router.options('*', (req, res) => {
@@ -126,38 +123,42 @@ router.get('/random/json', async (req, res) => {
   }
 });
 
-router.get('/images', async (req, res) => {
-  try {
-    const { category, orientation, page = 1, limit = 12 } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    
-    if (req.query.paginated === 'false') {
-      // 兼容原有的获取所有图片的逻辑
-      let images;
-      
-      if (category && orientation) {
-        images = await db.getImagesByCategory(category);
-        images = images.filter(img => img.orientation === orientation);
-      } else if (category) {
-        images = await db.getImagesByCategory(category);
-      } else if (orientation) {
-        images = await db.getImagesByOrientation(orientation);
-      } else {
-        images = await db.getAllImages();
-      }
-      
-      res.json(images);
-    } else {
-      // 默认使用分页
-      const result = await db.getImagesPaginated(pageNum, limitNum, category, orientation);
-      res.json(result);
-    }
-  } catch (error) {
-    console.error('Error getting images:', error);
-    res.status(500).json({ error: 'Internal server error' });
+router.get('/images', asyncHandler(async (req, res) => {
+  const { category, orientation, page = 1, limit = 12 } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  
+  // 验证参数
+  if (pageNum < 1) {
+    throw new ValidationError('页码必须大于0');
   }
-});
+  
+  if (limitNum < 1 || limitNum > 100) {
+    throw new ValidationError('每页数量必须在1-100之间');
+  }
+  
+  if (req.query.paginated === 'false') {
+    // 兼容原有的获取所有图片的逻辑
+    let images;
+    
+    if (category && orientation) {
+      images = await db.getImagesByCategory(category);
+      images = images.filter(img => img.orientation === orientation);
+    } else if (category) {
+      images = await db.getImagesByCategory(category);
+    } else if (orientation) {
+      images = await db.getImagesByOrientation(orientation);
+    } else {
+      images = await db.getAllImages();
+    }
+    
+    return ApiResponse.success(res, images, '获取图片列表成功');
+  } else {
+    // 默认使用分页
+    const result = await db.getImagesPaginated(pageNum, limitNum, category, orientation);
+    return ApiResponse.paginated(res, result.data, result.pagination, '获取图片列表成功');
+  }
+}));
 
 router.get('/images/:id', async (req, res) => {
   try {
