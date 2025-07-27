@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机图片API - 接口文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        .section h3 {
+            color: #333;
+            margin: 20px 0 10px 0;
+            font-size: 1.3em;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .get { background: #28a745; color: white; }
+        .post { background: #007bff; color: white; }
+        .put { background: #ffc107; color: black; }
+        .delete { background: #dc3545; color: white; }
+        .url { font-family: monospace; font-weight: bold; }
+        .params {
+            margin: 10px 0;
+        }
+        .param {
+            background: #e9ecef;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .example {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        .category-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .category-item {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 2px solid #667eea;
+        }
+        .admin-link {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .admin-link a {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .admin-link a:hover {
+            background: #5a6fd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 随机图片API</h1>
+            <p>高质量随机图片服务，支持多分类和设备方向适配</p>
+            <p>适用于网站背景、应用展示、开发测试等场景</p>
+        </div>
+
+        <div class="admin-link">
+            <a href="/login">🔐 管理员登录</a>
+        </div>
+
+        <div class="section">
+            <h2>🚀 快速开始</h2>
+            <p>获取一张随机图片：</p>
+            <div class="example">curl https://rp.itdianbao.com/api/random</div>
+            <p>在网页中使用：</p>
+            <div class="example">&lt;img src="https://rp.itdianbao.com/api/random" alt="随机图片"&gt;</div>
+        </div>
+
+        <div class="section">
+            <h2>📋 API接口</h2>
+            
+            <h3>获取随机图片</h3>
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="url">/api/random</span>
+                <div class="params">
+                    <div><strong>参数（可选）：</strong></div>
+                    <div class="param">category - 图片分类（landscape, anime, beauty, nature, city, art）</div>
+                    <div class="param">orientation - 图片方向（landscape=横屏/PC, portrait=竖屏/手机）</div>
+                </div>
+                <div><strong>返回：</strong>直接返回图片文件</div>
+            </div>
+
+            <h3>获取随机图片信息</h3>
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="url">/api/random/json</span>
+                <div class="params">
+                    <div><strong>参数：</strong>同上</div>
+                </div>
+                <div><strong>返回：</strong>JSON格式的图片信息</div>
+            </div>
+
+            <h3>获取图片列表</h3>
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="url">/api/images</span>
+                <div class="params">
+                    <div class="param">page - 页码（默认1）</div>
+                    <div class="param">limit - 每页数量（默认12）</div>
+                    <div class="param">category - 图片分类（可选）</div>
+                    <div class="param">orientation - 图片方向（可选）</div>
+                </div>
+            </div>
+
+            <h3>获取指定图片</h3>
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="url">/api/images/:id</span>
+                <div><strong>返回：</strong>指定ID的图片文件</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 图片分类</h2>
+            <div class="category-list">
+                <div class="category-item">
+                    <strong>landscape</strong><br>
+                    风景图片
+                </div>
+                <div class="category-item">
+                    <strong>anime</strong><br>
+                    动漫图片
+                </div>
+                <div class="category-item">
+                    <strong>beauty</strong><br>
+                    美女图片
+                </div>
+                <div class="category-item">
+                    <strong>nature</strong><br>
+                    自然风光
+                </div>
+                <div class="category-item">
+                    <strong>city</strong><br>
+                    城市建筑
+                </div>
+                <div class="category-item">
+                    <strong>art</strong><br>
+                    艺术作品
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📱 设备适配</h2>
+            <h3>横屏图片 (landscape)</h3>
+            <p>适合PC端、网页背景、桌面壁纸等场景</p>
+            <div class="example">https://rp.itdianbao.com/api/random?orientation=landscape</div>
+
+            <h3>竖屏图片 (portrait)</h3>
+            <p>适合手机端、移动应用、竖屏显示等场景</p>
+            <div class="example">https://rp.itdianbao.com/api/random?orientation=portrait</div>
+        </div>
+
+        <div class="section">
+            <h2>💡 使用示例</h2>
+            
+            <h3>获取风景类横屏图片</h3>
+            <div class="example">GET /api/random?category=landscape&orientation=landscape</div>
+
+            <h3>获取动漫类手机壁纸</h3>
+            <div class="example">GET /api/random?category=anime&orientation=portrait</div>
+
+            <h3>获取图片信息（JSON）</h3>
+            <div class="example">GET /api/random/json?category=nature</div>
+
+            <h3>JavaScript调用示例</h3>
+            <div class="example">
+// 设置随机背景图
+document.body.style.backgroundImage = 
+  'url(https://rp.itdianbao.com/api/random?category=landscape)';
+
+// 获取图片信息
+fetch('https://rp.itdianbao.com/api/random/json?category=anime')
+  .then(response => response.json())
+  .then(data => console.log(data));
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔧 技术特性</h2>
+            <ul style="margin-left: 20px;">
+                <li>✅ 支持CORS跨域访问</li>
+                <li>✅ 高质量图片资源</li>
+                <li>✅ 快速响应速度</li>
+                <li>✅ 多种分类和方向</li>
+                <li>✅ RESTful API设计</li>
+                <li>✅ JSON和图片双重返回格式</li>
+                <li>✅ 分页查询支持</li>
+                <li>✅ 安全认证系统</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>📞 联系支持</h2>
+            <p>如需更多功能或技术支持，请联系管理员。</p>
+            <p>当前服务状态：<span style="color: #28a745; font-weight: bold;">🟢 正常运行</span></p>
+        </div>
+    </div>
+
+    <script>
+        // 添加实时示例
+        document.addEventListener('DOMContentLoaded', function() {
+            // 可以在这里添加一些动态示例
+            console.log('随机图片API文档加载完成');
+        });
+    </script>
+</body>
+</html>

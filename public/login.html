@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机图片API - 登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+        
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background-color: #fafafa;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .captcha-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .captcha-image {
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        .captcha-image:hover {
+            border-color: #667eea;
+        }
+        
+        .captcha-refresh {
+            background: #f8f9fa;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .captcha-refresh:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .alert {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .alert-error {
+            background-color: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+        
+        .alert-success {
+            background-color: #efe;
+            color: #373;
+            border: 1px solid #cfc;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .default-account {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            text-align: center;
+            color: #666;
+        }
+        
+        .default-account strong {
+            color: #333;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+            
+            .captcha-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🎨 随机图片API</h1>
+            <p>管理员登录</p>
+        </div>
+        
+        <div class="alert alert-error" id="errorAlert"></div>
+        <div class="alert alert-success" id="successAlert"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            
+            <div class="form-group">
+                <label for="captchaText">验证码</label>
+                <div class="captcha-container">
+                    <div id="captchaImage" class="captcha-image"></div>
+                    <button type="button" class="captcha-refresh" onclick="refreshCaptcha()">刷新</button>
+                </div>
+                <input type="text" id="captchaText" name="captchaText" required placeholder="请输入验证码" style="margin-top: 10px;">
+                <input type="hidden" id="captchaId" name="captchaId">
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                登录
+            </button>
+            
+            <div class="loading" id="loading">
+                正在登录...
+            </div>
+        </form>
+        
+        <div class="default-account">
+            <strong>默认管理员账号:</strong><br>
+            用户名: admin<br>
+            密码: admin123
+        </div>
+        
+        <div class="footer">
+            © 2025 随机图片API系统
+        </div>
+    </div>
+
+    <script>
+        let currentCaptchaId = null;
+        
+        // 页面加载时检查登录状态
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Login page loaded');
+            checkLoginStatus();
+            refreshCaptcha();
+            
+            // 添加调试按钮（仅开发环境）
+            if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
+                const debugBtn = document.createElement('button');
+                debugBtn.textContent = '测试登录(跳过验证码)';
+                debugBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;background:red;color:white;padding:5px;';
+                debugBtn.onclick = testLogin;
+                document.body.appendChild(debugBtn);
+            }
+        });
+        
+        async function testLogin() {
+            const formData = new FormData();
+            formData.append('username', 'admin');
+            formData.append('password', 'admin123');
+            formData.append('captchaId', 'test');
+            formData.append('captchaText', 'test');
+            
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                console.log('Test login response:', data);
+                alert(`Test login result: ${JSON.stringify(data)}`);
+            } catch (error) {
+                console.error('Test login error:', error);
+                alert('Test login error: ' + error.message);
+            }
+        }
+        
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/auth/status', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.isLoggedIn) {
+                    window.location.href = '/admin';
+                }
+            } catch (error) {
+                console.log('Check login status failed:', error);
+            }
+        }
+        
+        async function refreshCaptcha() {
+            try {
+                console.log('Refreshing captcha...');
+                const response = await fetch('/auth/captcha');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Captcha loaded:', data.id);
+                
+                currentCaptchaId = data.id;
+                document.getElementById('captchaId').value = data.id;
+                document.getElementById('captchaImage').innerHTML = data.svg;
+                document.getElementById('captchaText').value = '';
+            } catch (error) {
+                console.error('Captcha refresh error:', error);
+                showAlert('获取验证码失败: ' + error.message, 'error');
+            }
+        }
+        
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loading');
+            
+            // 禁用按钮和显示加载状态
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            
+            try {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value.trim();
+                const captchaId = document.getElementById('captchaId').value.trim();
+                const captchaText = document.getElementById('captchaText').value.trim();
+                
+                console.log('Form values:', { 
+                    username: username || '(empty)', 
+                    password: password ? '***' : '(empty)', 
+                    captchaId: captchaId || '(empty)', 
+                    captchaText: captchaText || '(empty)'
+                });
+                
+                if (!username) {
+                    showAlert('请输入用户名', 'error');
+                    submitBtn.disabled = false;
+                    loading.style.display = 'none';
+                    return;
+                }
+                
+                if (!password) {
+                    showAlert('请输入密码', 'error');
+                    submitBtn.disabled = false;
+                    loading.style.display = 'none';
+                    return;
+                }
+                
+                if (!captchaId) {
+                    showAlert('验证码未加载，请刷新页面', 'error');
+                    submitBtn.disabled = false;
+                    loading.style.display = 'none';
+                    refreshCaptcha();
+                    return;
+                }
+                
+                if (!captchaText) {
+                    showAlert('请输入验证码', 'error');
+                    submitBtn.disabled = false;
+                    loading.style.display = 'none';
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+                formData.append('captchaId', captchaId);
+                formData.append('captchaText', captchaText);
+                
+                console.log('Sending login request...');
+                
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok && data.success) {
+                    showAlert('登录成功，正在跳转...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 1000);
+                } else {
+                    showAlert(data.error || '登录失败', 'error');
+                    refreshCaptcha(); // 刷新验证码
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('网络错误，请重试', 'error');
+                refreshCaptcha();
+            } finally {
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+        
+        function showAlert(message, type) {
+            const alertId = type === 'success' ? 'successAlert' : 'errorAlert';
+            const alert = document.getElementById(alertId);
+            
+            // 隐藏其他类型的提示
+            document.querySelectorAll('.alert').forEach(el => el.style.display = 'none');
+            
+            alert.textContent = message;
+            alert.style.display = 'block';
+            
+            // 3秒后自动隐藏错误提示
+            if (type === 'error') {
+                setTimeout(() => {
+                    alert.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // 点击验证码图片刷新
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('#captchaImage')) {
+                refreshCaptcha();
+            }
+        });
+        
+        // 回车键提交表单
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>
