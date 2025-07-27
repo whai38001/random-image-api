@@ -25,8 +25,8 @@ WORKDIR /app
 # 复制package文件
 COPY package*.json ./
 
-# 安装所有依赖（包括开发依赖）
-RUN npm ci --only=production && npm cache clean --force
+# 安装生产依赖
+RUN npm install --omit=dev && npm cache clean --force
 
 # ========================
 # 生产阶段  
