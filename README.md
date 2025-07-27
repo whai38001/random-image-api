@@ -22,22 +22,31 @@
 - **数据统计**: 实时统计各分类图片数量
 - **用户管理**: 完整的用户注册、审批和权限管理
 - **系统设置**: 注册控制、维护模式、用户限制等
+- **实时搜索**: 支持关键词、分类、方向多维搜索
+- **搜索建议**: 智能关键词提示和热门推荐
+- **邮件服务**: 注册确认和密码重置邮件
 
 ### 🔒 安全特性
-- **用户认证**: JWT + Session双重认证
+- **双重认证**: JWT + Session双重认证机制
 - **验证码保护**: SVG验证码防止自动化攻击
 - **访问控制**: IP/域名黑白名单管理
 - **频率限制**: 多级API请求频率限制
 - **安全头部**: Helmet安全中间件
 - **维护模式**: 支持系统维护时的访问控制
+- **异常检测**: 智能可疑活动检测和自动封禁
+- **文件安全**: 完整的文件上传安全验证
+- **路径保护**: 防路径遍历攻击
+- **SQL注入防护**: 参数化查询和输入验证
 
 ### ⚡ 性能优化
 - **数据库索引**: 12个关键索引优化查询性能
 - **缩略图优化**: 智能缩略图生成和缓存策略
+- **Worker线程池**: 高性能并行图片处理
 - **懒加载机制**: Intersection Observer实现图片懒加载
 - **统计API优化**: 专门的统计端点避免大数据加载
 - **CORS支持**: 默认支持跨域访问
 - **健康检查**: 内置健康检查端点
+- **性能监控**: 实时响应时间和内存监控
 
 ### 📊 分析统计
 - **使用分析**: 详细的API调用统计和用户行为分析
@@ -61,7 +70,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/random-image-api.git
+git clone https://github.com/whai38001/random-image-api.git
 cd random-image-api
 
 # 复制环境配置
@@ -80,7 +89,7 @@ docker-compose up -d
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/random-image-api.git
+git clone https://github.com/whai38001/random-image-api.git
 cd random-image-api
 
 # 安装依赖
@@ -164,6 +173,25 @@ PUT /api/images/:id
 
 # 删除图片
 DELETE /api/images/:id
+```
+
+### 搜索API
+
+```bash
+# 综合搜索
+GET /api/search?query=keyword&category=nature&orientation=landscape&type=local&sort=newest&page=1&limit=12
+
+# 搜索建议
+GET /api/search/suggestions?q=keyword&limit=5
+
+# 热门关键词
+GET /api/search/popular?limit=10
+
+# 获取所有分类
+GET /api/search/categories
+
+# 快速过滤
+GET /api/search/filter?type=local&orientation=landscape
 ```
 
 ### 统计API
@@ -282,8 +310,8 @@ docker-compose --profile nginx --profile monitoring up -d
 
 如果您觉得这个项目有用，请给它一个 ⭐️！
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/random-image-api/issues)
-- **讨论**: [GitHub Discussions](https://github.com/your-username/random-image-api/discussions)
+- **Issues**: [GitHub Issues](https://github.com/whai38001/random-image-api/issues)
+- **讨论**: [GitHub Discussions](https://github.com/whai38001/random-image-api/discussions)
 
 ## 🙏 致谢
 
@@ -299,6 +327,6 @@ docker-compose --profile nginx --profile monitoring up -d
 
 **[⬆ 回到顶部](#-random-image-api)**
 
-Made with ❤️ by [your-username](https://github.com/your-username)
+Made with ❤️ by [whai38001](https://github.com/whai38001)
 
 </div>

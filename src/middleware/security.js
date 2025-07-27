@@ -303,7 +303,7 @@ class SecurityMiddleware {
   }
 
   // 手动添加IP到黑名单
-  blockIP(ip, reason = 'Manual block') {
+  manualBlockIP(ip, reason = 'Manual block') {
     this.blockedIPs.add(ip);
     console.log(`🚫 手动封禁IP: ${ip}, 原因: ${reason}`);
     
