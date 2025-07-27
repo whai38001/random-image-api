@@ -4,10 +4,23 @@ const path = require('path');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const Database = require('../models/Database');
+const ThumbnailService = require('../services/ThumbnailService');
 const { authenticateSession } = require('../middleware/auth');
 
 const router = express.Router();
 const db = new Database();
+const thumbnailService = new ThumbnailService();
+
+// 统计信息端点 - 优化性能
+router.get('/stats', async (req, res) => {
+  try {
+    const stats = await db.getImageStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({ error: '获取统计信息失败' });
+  }
+});
 
 // 处理OPTIONS预检请求
 router.options('*', (req, res) => {
@@ -190,21 +203,14 @@ router.post('/images', authenticateSession, upload.single('image'), async (req, 
       const metadata = await sharp(req.file.path).metadata();
       const detectedOrientation = metadata.width > metadata.height ? 'landscape' : 'portrait';
       
-      // 生成缩略图
-      const thumbnailFilename = 'thumb_' + req.file.filename;
-      const thumbnailPath = path.join(__dirname, '../../public/uploads/thumbnails', thumbnailFilename);
-      
-      // 确保缩略图目录存在
-      fs.ensureDirSync(path.join(__dirname, '../../public/uploads/thumbnails'));
-      
-      // 创建200x200缩略图
-      await sharp(req.file.path)
-        .resize(200, 200, { 
-          fit: 'cover',
-          position: 'center'
+      // 异步生成多种尺寸的缩略图（不阻塞响应）
+      thumbnailService.addToQueue(req.file.path, req.file.filename, 'high')
+        .then(() => {
+          console.log(`📋 Added ${req.file.filename} to thumbnail generation queue`);
         })
-        .jpeg({ quality: 80 })
-        .toFile(thumbnailPath);
+        .catch(error => {
+          console.error(`❌ Failed to add ${req.file.filename} to thumbnail queue:`, error);
+        });
       
       imageData = {
         filename: req.file.filename,
@@ -213,7 +219,7 @@ router.post('/images', authenticateSession, upload.single('image'), async (req, 
         orientation: orientation || detectedOrientation,
         url: null,
         is_local: 1,
-        thumbnail: thumbnailFilename
+        thumbnail: `medium_${req.file.filename}` // 预设缩略图名称
       };
     } else if (url) {
       imageData = {
@@ -295,6 +301,14 @@ router.delete('/images/:id', authenticateSession, async (req, res) => {
     if (image.is_local && image.filename) {
       const imagePath = path.join(__dirname, '../../public/uploads', image.filename);
       await fs.remove(imagePath).catch(console.error);
+      
+      // 删除所有相关的缩略图
+      for (const size of ['small', 'medium', 'large']) {
+        const thumbnailPath = path.join(__dirname, '../../public/uploads/thumbnails', size, `${size}_${image.filename}`);
+        await fs.remove(thumbnailPath).catch(console.error);
+      }
+      
+      console.log(`🗑️ Deleted image and thumbnails for: ${image.filename}`);
     }
 
     await db.deleteImage(imageId);
@@ -305,26 +319,13 @@ router.delete('/images/:id', authenticateSession, async (req, res) => {
   }
 });
 
-// 缩略图访问路由
+// 缩略图访问路由（兼容性保持，重定向到新路由）
 router.get('/thumbnails/:filename', async (req, res) => {
   try {
-    // 设置CORS头部
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    
-    const thumbnailPath = path.join(__dirname, '../../public/uploads/thumbnails', req.params.filename);
-    
-    if (await fs.pathExists(thumbnailPath)) {
-      // 设置缓存头部
-      res.header('Cache-Control', 'public, max-age=86400'); // 24小时缓存
-      res.sendFile(thumbnailPath);
-    } else {
-      res.status(404).json({ error: 'Thumbnail not found' });
-    }
+    // 重定向到新的缩略图服务
+    res.redirect(`/thumbnails/medium/${req.params.filename}`);
   } catch (error) {
-    console.error('Error getting thumbnail:', error);
+    console.error('Error redirecting thumbnail:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

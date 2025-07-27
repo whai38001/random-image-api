@@ -62,11 +62,74 @@ class Database {
       )
     `;
     
+    const createPasswordResetsTableQuery = `
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    `;
+    
+    const createApiStatsTableQuery = `
+      CREATE TABLE IF NOT EXISTS api_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        endpoint TEXT NOT NULL,
+        method TEXT NOT NULL,
+        ip_address TEXT,
+        user_agent TEXT,
+        referer TEXT,
+        response_status INTEGER,
+        response_time INTEGER, -- in milliseconds
+        image_id INTEGER,
+        category TEXT,
+        orientation TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (image_id) REFERENCES images (id)
+      )
+    `;
+    
+    const createDailyStatsTableQuery = `
+      CREATE TABLE IF NOT EXISTS daily_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT UNIQUE NOT NULL, -- YYYY-MM-DD format
+        total_requests INTEGER DEFAULT 0,
+        unique_ips INTEGER DEFAULT 0,
+        successful_requests INTEGER DEFAULT 0,
+        failed_requests INTEGER DEFAULT 0,
+        avg_response_time REAL DEFAULT 0,
+        popular_category TEXT,
+        popular_orientation TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+    
+    const createSystemConfigTableQuery = `
+      CREATE TABLE IF NOT EXISTS system_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        config_key TEXT UNIQUE NOT NULL,
+        config_value TEXT NOT NULL,
+        description TEXT,
+        updated_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (updated_by) REFERENCES users (id)
+      )
+    `;
+    
     this.db.serialize(() => {
       this.db.run(createImagesTableQuery);
       this.db.run(createUsersTableQuery);
       this.db.run(createAccessControlTableQuery);
       this.db.run(createSessionsTableQuery);
+      this.db.run(createPasswordResetsTableQuery);
+      this.db.run(createApiStatsTableQuery);
+      this.db.run(createDailyStatsTableQuery);
+      this.db.run(createSystemConfigTableQuery);
     
     // 检查并添加thumbnail字段（兼容旧数据库）
     this.db.all("PRAGMA table_info(images)", (err, columns) => {
@@ -103,11 +166,58 @@ class Database {
         }
       });
       
+      // 初始化默认系统配置
+      this.initDefaultSystemConfig();
+      
       console.log('Database initialized successfully');
     });
     
     // 创建性能优化索引
     this.createIndexes();
+  }
+
+  // 初始化默认系统配置
+  async initDefaultSystemConfig() {
+    const defaultConfigs = [
+      {
+        key: 'registration_enabled',
+        value: 'true',
+        description: '是否允许用户注册'
+      },
+      {
+        key: 'registration_require_approval',
+        value: 'false',
+        description: '注册后是否需要管理员审核'
+      },
+      {
+        key: 'max_users',
+        value: '1000',
+        description: '最大用户数量限制'
+      },
+      {
+        key: 'registration_message',
+        value: '欢迎注册 Random Image API！',
+        description: '注册页面显示消息'
+      },
+      {
+        key: 'site_maintenance',
+        value: 'false',
+        description: '网站维护模式'
+      }
+    ];
+
+    try {
+      for (const config of defaultConfigs) {
+        // 检查配置是否已存在
+        const existing = await this.getSystemConfig(config.key);
+        if (!existing) {
+          await this.setSystemConfig(config.key, config.value, config.description);
+          console.log(`📋 Initialized system config: ${config.key} = ${config.value}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing default system config:', error);
+    }
   }
 
   // 创建数据库索引以优化查询性能
@@ -131,7 +241,22 @@ class Database {
       
       // 会话表索引
       "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)",
-      "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)"
+      "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)",
+      
+      // API统计表索引
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_endpoint ON api_stats(endpoint)",
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_ip_address ON api_stats(ip_address)",
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_created_at ON api_stats(created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_response_status ON api_stats(response_status)",
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_category ON api_stats(category)",
+      "CREATE INDEX IF NOT EXISTS idx_api_stats_orientation ON api_stats(orientation)",
+      
+      // 日统计表索引
+      "CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date)",
+      
+      // 系统配置表索引
+      "CREATE INDEX IF NOT EXISTS idx_system_config_key ON system_config(config_key)",
+      "CREATE INDEX IF NOT EXISTS idx_system_config_updated_by ON system_config(updated_by)"
     ];
     
     indexes.forEach(indexSql => {
@@ -143,6 +268,411 @@ class Database {
     });
     
     console.log('Database indexes created for performance optimization');
+  }
+
+  // 系统配置管理方法
+  getSystemConfig(key) {
+    return new Promise((resolve, reject) => {
+      const query = 'SELECT * FROM system_config WHERE config_key = ?';
+      this.db.get(query, [key], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  getAllSystemConfigs() {
+    return new Promise((resolve, reject) => {
+      const query = 'SELECT * FROM system_config ORDER BY config_key ASC';
+      this.db.all(query, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  setSystemConfig(key, value, description = null, updatedBy = null) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        INSERT OR REPLACE INTO system_config 
+        (config_key, config_value, description, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `;
+      
+      this.db.run(query, [key, value, description, updatedBy], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({
+            id: this.lastID,
+            config_key: key,
+            config_value: value,
+            description,
+            updated_by: updatedBy
+          });
+        }
+      });
+    });
+  }
+
+  deleteSystemConfig(key) {
+    return new Promise((resolve, reject) => {
+      const query = 'DELETE FROM system_config WHERE config_key = ?';
+      this.db.run(query, [key], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ changes: this.changes });
+        }
+      });
+    });
+  }
+
+  // 便捷方法：检查注册是否启用
+  async isRegistrationEnabled() {
+    try {
+      const config = await this.getSystemConfig('registration_enabled');
+      return config ? config.config_value === 'true' : true; // 默认启用
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+      return true; // 发生错误时默认允许注册
+    }
+  }
+
+  // 便捷方法：检查是否需要审核
+  async isRegistrationApprovalRequired() {
+    try {
+      const config = await this.getSystemConfig('registration_require_approval');
+      return config ? config.config_value === 'true' : false; // 默认不需要审核
+    } catch (error) {
+      console.error('Error checking approval requirement:', error);
+      return false;
+    }
+  }
+
+  // 便捷方法：获取最大用户数限制
+  async getMaxUsersLimit() {
+    try {
+      const config = await this.getSystemConfig('max_users');
+      return config ? parseInt(config.config_value) : 1000; // 默认1000
+    } catch (error) {
+      console.error('Error getting max users limit:', error);
+      return 1000;
+    }
+  }
+
+  // 便捷方法：检查网站是否在维护模式
+  async isMaintenanceMode() {
+    try {
+      const config = await this.getSystemConfig('site_maintenance');
+      return config ? config.config_value === 'true' : false; // 默认不维护
+    } catch (error) {
+      console.error('Error checking maintenance mode:', error);
+      return false;
+    }
+  }
+
+  // Analytics and Statistics Methods
+  recordApiRequest(requestData) {
+    return new Promise((resolve, reject) => {
+      const { 
+        endpoint, method, ip_address, user_agent, referer, 
+        response_status, response_time, image_id, category, orientation 
+      } = requestData;
+      
+      const query = `
+        INSERT INTO api_stats 
+        (endpoint, method, ip_address, user_agent, referer, response_status, response_time, image_id, category, orientation)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.db.run(query, [
+        endpoint, method, ip_address, user_agent, referer, 
+        response_status, response_time, image_id, category, orientation
+      ], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ id: this.lastID });
+        }
+      });
+    });
+  }
+
+  updateDailyStats(date = null) {
+    return new Promise((resolve, reject) => {
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      
+      // 获取当日统计数据
+      const statsQuery = `
+        SELECT 
+          COUNT(*) as total_requests,
+          COUNT(DISTINCT ip_address) as unique_ips,
+          SUM(CASE WHEN response_status = 200 THEN 1 ELSE 0 END) as successful_requests,
+          SUM(CASE WHEN response_status != 200 THEN 1 ELSE 0 END) as failed_requests,
+          AVG(response_time) as avg_response_time
+        FROM api_stats 
+        WHERE DATE(created_at) = ?
+      `;
+      
+      this.db.get(statsQuery, [targetDate], (err, stats) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        // 获取最受欢迎的分类和方向
+        const popularQuery = `
+          SELECT 
+            category,
+            orientation,
+            COUNT(*) as count
+          FROM api_stats 
+          WHERE DATE(created_at) = ? AND category IS NOT NULL
+          GROUP BY category, orientation 
+          ORDER BY count DESC 
+          LIMIT 1
+        `;
+        
+        this.db.get(popularQuery, [targetDate], (err, popular) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          
+          // 更新或插入日统计
+          const upsertQuery = `
+            INSERT OR REPLACE INTO daily_stats 
+            (date, total_requests, unique_ips, successful_requests, failed_requests, avg_response_time, popular_category, popular_orientation, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `;
+          
+          this.db.run(upsertQuery, [
+            targetDate,
+            stats.total_requests || 0,
+            stats.unique_ips || 0,
+            stats.successful_requests || 0,
+            stats.failed_requests || 0,
+            stats.avg_response_time || 0,
+            popular ? popular.category : null,
+            popular ? popular.orientation : null
+          ], function(err) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve({ date: targetDate, ...stats, popular });
+            }
+          });
+        });
+      });
+    });
+  }
+
+  getApiStats(days = 7) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT * FROM daily_stats 
+        WHERE date >= date('now', '-${days} days')
+        ORDER BY date DESC
+      `;
+      
+      this.db.all(query, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  getDetailedStats(startDate, endDate) {
+    return new Promise((resolve, reject) => {
+      const queries = {
+        // 总体统计
+        overview: `
+          SELECT 
+            COUNT(*) as total_requests,
+            COUNT(DISTINCT ip_address) as unique_visitors,
+            SUM(CASE WHEN response_status = 200 THEN 1 ELSE 0 END) as successful_requests,
+            SUM(CASE WHEN response_status != 200 THEN 1 ELSE 0 END) as failed_requests,
+            AVG(response_time) as avg_response_time,
+            MIN(created_at) as first_request,
+            MAX(created_at) as last_request
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ?
+        `,
+        
+        // 每日趋势
+        daily_trend: `
+          SELECT 
+            DATE(created_at) as date,
+            COUNT(*) as requests,
+            COUNT(DISTINCT ip_address) as unique_ips,
+            AVG(response_time) as avg_response_time
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ?
+          GROUP BY DATE(created_at)
+          ORDER BY date ASC
+        `,
+        
+        // 热门分类
+        popular_categories: `
+          SELECT 
+            category,
+            COUNT(*) as count,
+            COUNT(DISTINCT ip_address) as unique_users
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ? AND category IS NOT NULL
+          GROUP BY category 
+          ORDER BY count DESC 
+          LIMIT 10
+        `,
+        
+        // 热门方向
+        popular_orientations: `
+          SELECT 
+            orientation,
+            COUNT(*) as count,
+            COUNT(DISTINCT ip_address) as unique_users
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ? AND orientation IS NOT NULL
+          GROUP BY orientation 
+          ORDER BY count DESC
+        `,
+        
+        // 热门端点
+        popular_endpoints: `
+          SELECT 
+            endpoint,
+            method,
+            COUNT(*) as count,
+            AVG(response_time) as avg_response_time
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ?
+          GROUP BY endpoint, method 
+          ORDER BY count DESC 
+          LIMIT 10
+        `,
+        
+        // 状态码分布
+        status_distribution: `
+          SELECT 
+            response_status,
+            COUNT(*) as count,
+            ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM api_stats WHERE DATE(created_at) BETWEEN ? AND ?), 2) as percentage
+          FROM api_stats 
+          WHERE DATE(created_at) BETWEEN ? AND ?
+          GROUP BY response_status 
+          ORDER BY count DESC
+        `,
+        
+        // 热门图片
+        popular_images: `
+          SELECT 
+            i.id,
+            i.filename,
+            i.category,
+            i.orientation,
+            COUNT(s.image_id) as requests
+          FROM api_stats s
+          JOIN images i ON s.image_id = i.id
+          WHERE DATE(s.created_at) BETWEEN ? AND ?
+          GROUP BY s.image_id 
+          ORDER BY requests DESC 
+          LIMIT 10
+        `
+      };
+      
+      const results = {};
+      const params = [startDate, endDate];
+      let completed = 0;
+      const total = Object.keys(queries).length;
+      
+      Object.entries(queries).forEach(([key, query]) => {
+        // 状态码分布需要4个参数
+        const queryParams = key === 'status_distribution' ? [startDate, endDate, startDate, endDate] : params;
+        
+        this.db.all(query, queryParams, (err, rows) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          
+          results[key] = rows;
+          completed++;
+          
+          if (completed === total) {
+            resolve(results);
+          }
+        });
+      });
+    });
+  }
+
+  getTopIPs(days = 7, limit = 10) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT 
+          ip_address,
+          COUNT(*) as requests,
+          COUNT(DISTINCT DATE(created_at)) as active_days,
+          MIN(created_at) as first_seen,
+          MAX(created_at) as last_seen
+        FROM api_stats 
+        WHERE DATE(created_at) >= date('now', '-${days} days')
+          AND ip_address IS NOT NULL
+        GROUP BY ip_address 
+        ORDER BY requests DESC 
+        LIMIT ?
+      `;
+      
+      this.db.all(query, [limit], (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
+  }
+
+  getResponseTimeStats(days = 7) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT 
+          endpoint,
+          COUNT(*) as total_requests,
+          AVG(response_time) as avg_response_time,
+          MIN(response_time) as min_response_time,
+          MAX(response_time) as max_response_time,
+          CASE 
+            WHEN response_time < 100 THEN 'fast'
+            WHEN response_time < 500 THEN 'normal'
+            WHEN response_time < 1000 THEN 'slow'
+            ELSE 'very_slow'
+          END as performance_category
+        FROM api_stats 
+        WHERE DATE(created_at) >= date('now', '-${days} days')
+          AND response_time IS NOT NULL
+        GROUP BY endpoint
+        ORDER BY avg_response_time DESC
+      `;
+      
+      this.db.all(query, (err, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
+        }
+      });
+    });
   }
 
   addImage(imageData) {
@@ -173,6 +703,48 @@ class Database {
         }
       });
     });
+  }
+
+  // 优化的统计信息查询 - 避免加载所有图片数据
+  async getImageStats() {
+    try {
+      const [totalResult, landscapeResult, portraitResult, categoriesResult] = await Promise.all([
+        new Promise((resolve, reject) => {
+          this.db.get('SELECT COUNT(*) as count FROM images', (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count);
+          });
+        }),
+        new Promise((resolve, reject) => {
+          this.db.get('SELECT COUNT(*) as count FROM images WHERE orientation = "landscape"', (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count);
+          });
+        }),
+        new Promise((resolve, reject) => {
+          this.db.get('SELECT COUNT(*) as count FROM images WHERE orientation = "portrait"', (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count);
+          });
+        }),
+        new Promise((resolve, reject) => {
+          this.db.get('SELECT COUNT(DISTINCT category) as count FROM images', (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count);
+          });
+        })
+      ]);
+
+      return {
+        total: totalResult || 0,
+        landscape: landscapeResult || 0,
+        portrait: portraitResult || 0,
+        categories: categoriesResult || 0
+      };
+    } catch (error) {
+      console.error('getImageStats error:', error);
+      throw error;
+    }
   }
 
   getImagesByCategory(category) {
@@ -324,19 +896,19 @@ class Database {
   async createUser(userData) {
     return new Promise(async (resolve, reject) => {
       try {
-        const { username, password, email, role = 'admin' } = userData;
+        const { username, password, email, role = 'admin', is_active = 1 } = userData;
         const hashedPassword = await bcrypt.hash(password, 10);
         
         const query = `
-          INSERT INTO users (username, password, email, role)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO users (username, password, email, role, is_active)
+          VALUES (?, ?, ?, ?, ?)
         `;
         
-        this.db.run(query, [username, hashedPassword, email, role], function(err) {
+        this.db.run(query, [username, hashedPassword, email, role, is_active], function(err) {
           if (err) {
             reject(err);
           } else {
-            resolve({ id: this.lastID, username, email, role });
+            resolve({ id: this.lastID, username, email, role, is_active });
           }
         });
       } catch (error) {
@@ -445,6 +1017,81 @@ class Database {
           reject(err);
         } else {
           resolve({ changes: this.changes });
+        }
+      });
+    });
+  }
+
+  // Password Reset Methods
+  createPasswordResetToken(userId, token, expiresAt) {
+    return new Promise((resolve, reject) => {
+      // 先清理该用户的旧token
+      this.db.run('DELETE FROM password_resets WHERE user_id = ?', [userId], (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        // 创建新的重置token
+        const query = `
+          INSERT INTO password_resets (user_id, token, expires_at)
+          VALUES (?, ?, ?)
+        `;
+        
+        this.db.run(query, [userId, token, expiresAt], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({
+              id: this.lastID,
+              user_id: userId,
+              token,
+              expires_at: expiresAt
+            });
+          }
+        });
+      });
+    });
+  }
+
+  findPasswordResetToken(token) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT pr.*, u.username, u.email 
+        FROM password_resets pr
+        JOIN users u ON pr.user_id = u.id
+        WHERE pr.token = ? AND pr.used = 0 AND pr.expires_at > datetime('now')
+      `;
+      
+      this.db.get(query, [token], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  usePasswordResetToken(token) {
+    return new Promise((resolve, reject) => {
+      this.db.run('UPDATE password_resets SET used = 1 WHERE token = ?', [token], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ changes: this.changes });
+        }
+      });
+    });
+  }
+
+  findUserByEmail(email) {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT * FROM users WHERE email = ? AND is_active = 1', [email], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
         }
       });
     });

@@ -231,6 +231,27 @@
             transform: scale(1.05);
         }
         
+        .thumbnail.placeholder-image {
+            opacity: 0.7;
+            filter: blur(1px);
+        }
+        
+        .thumbnail.loading {
+            opacity: 0.5;
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        .thumbnail.loaded {
+            opacity: 1;
+            filter: none;
+            transition: opacity 0.3s ease, filter 0.3s ease;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.5; }
+            to { opacity: 0.8; }
+        }
+        
         .thumbnail-overlay {
             position: absolute;
             top: 8px;
@@ -476,6 +497,7 @@
             <button class="tab" onclick="showTab('manage')">管理图片</button>
             <button class="tab" onclick="showTab('users')">账号管理</button>
             <button class="tab" onclick="showTab('security')">安全设置</button>
+            <button class="tab" onclick="showTab('system')">系统设置</button>
         </div>
         
         <div id="uploadTab" class="tab-content active">
@@ -510,6 +532,12 @@
                 <div class="form-group">
                     <label for="imageFile">本地图片上传</label>
                     <input type="file" id="imageFile" name="image" accept="image/*">
+                    <div id="uploadProgress" style="display: none; margin-top: 10px;">
+                        <div style="background: #e1e5e9; border-radius: 4px; overflow: hidden;">
+                            <div id="progressBar" style="height: 4px; background: #667eea; width: 0%; transition: width 0.3s ease;"></div>
+                        </div>
+                        <div id="progressText" style="font-size: 12px; color: #666; margin-top: 5px;">上传中...</div>
+                    </div>
                 </div>
                 
                 <div style="text-align: center; margin: 20px 0; color: #666;">或</div>
@@ -544,6 +572,16 @@
                         <option value="landscape">横屏</option>
                         <option value="portrait">竖屏</option>
                     </select>
+                </div>
+            </div>
+            
+            <!-- 缩略图管理工具栏 -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <span style="font-weight: 600; color: #333;">缩略图管理:</span>
+                    <button class="btn btn-secondary" onclick="generateMissingThumbnails()">生成缺失缩略图</button>
+                    <button class="btn btn-secondary" onclick="loadThumbnailStats()">查看统计信息</button>
+                    <span id="thumbnailStats" style="color: #666; font-size: 14px;"></span>
                 </div>
             </div>
             
@@ -627,6 +665,77 @@
                 
                 <div id="accessRulesContainer" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
                     <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="systemTab" class="tab-content">
+            <h2>系统设置</h2>
+            
+            <div style="margin-bottom: 30px;">
+                <h3>注册控制</h3>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <form id="registrationForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="registrationEnabled">允许注册</label>
+                                <select id="registrationEnabled" name="registration_enabled">
+                                    <option value="true">开启</option>
+                                    <option value="false">关闭</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="registrationApproval">需要审批</label>
+                                <select id="registrationApproval" name="registration_require_approval">
+                                    <option value="false">否</option>
+                                    <option value="true">是</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="maxUsers">用户数量限制</label>
+                                <input type="number" id="maxUsers" name="max_users" min="1" max="100000" placeholder="最大用户数">
+                            </div>
+                            <div class="form-group">
+                                <label for="maintenanceMode">维护模式</label>
+                                <select id="maintenanceMode" name="site_maintenance">
+                                    <option value="false">关闭</option>
+                                    <option value="true">开启</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registrationMessage">注册页面消息</label>
+                            <textarea id="registrationMessage" name="registration_message" rows="3" 
+                                placeholder="显示在注册页面的欢迎消息" 
+                                style="width: 100%; padding: 12px 15px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 16px; resize: vertical; min-height: 80px;"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn">保存设置</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>待审核用户</h3>
+                    <button class="btn btn-secondary" onclick="loadPendingUsers()">刷新</button>
+                </div>
+                
+                <div id="pendingUsersContainer" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <div>
+                <h3>系统信息</h3>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <div id="systemInfoContainer">
+                        <div class="loading">加载中...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -806,10 +915,15 @@
             
             if (tabName === 'manage') {
                 loadImages(1);
+                loadThumbnailStats();
             } else if (tabName === 'users') {
                 loadUsers();
             } else if (tabName === 'security') {
                 loadAccessRules();
+            } else if (tabName === 'system') {
+                loadSystemSettings();
+                loadPendingUsers();
+                loadSystemInfo();
             }
         }
         
@@ -827,6 +941,15 @@
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            // 防止重复提交
+            if (submitBtn.disabled) return;
+            
             const formData = new FormData();
             const category = document.getElementById('category').value;
             const orientation = document.getElementById('orientation').value;
@@ -843,6 +966,12 @@
                 return;
             }
             
+            // 文件大小检查
+            if (imageFile && imageFile.size > 10 * 1024 * 1024) { // 10MB限制
+                showAlert('图片文件大小不能超过10MB', 'error');
+                return;
+            }
+            
             formData.append('category', category);
             formData.append('orientation', orientation);
             
@@ -854,22 +983,94 @@
                 formData.append('url', imageUrl);
             }
             
+            // 禁用按钮并显示进度
+            submitBtn.disabled = true;
+            submitBtn.textContent = '上传中...';
+            
+            // 显示进度条（仅文件上传时）
+            if (imageFile) {
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressText.textContent = '准备上传...';
+            }
+            
             try {
-                const response = await fetch('/api/images', {
-                    method: 'POST',
-                    body: formData
+                // 使用XMLHttpRequest以支持进度显示
+                const uploadPromise = new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    
+                    // 上传进度监听（仅文件上传时）
+                    if (imageFile) {
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const percentComplete = (e.loaded / e.total) * 100;
+                                progressBar.style.width = percentComplete + '%';
+                                progressText.textContent = `上传中... ${Math.round(percentComplete)}%`;
+                            }
+                        });
+                    }
+                    
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                resolve(response);
+                            } catch (e) {
+                                reject(new Error('响应解析失败'));
+                            }
+                        } else {
+                            try {
+                                const error = JSON.parse(xhr.responseText);
+                                reject(new Error(error.error || '上传失败'));
+                            } catch (e) {
+                                reject(new Error('上传失败'));
+                            }
+                        }
+                    });
+                    
+                    xhr.addEventListener('error', () => {
+                        reject(new Error('网络错误'));
+                    });
+                    
+                    xhr.open('POST', '/api/images');
+                    xhr.send(formData);
                 });
                 
-                if (response.ok) {
-                    showAlert('图片添加成功！', 'success');
-                    document.getElementById('uploadForm').reset();
-                    updateStats();
-                } else {
-                    const error = await response.json();
-                    showAlert(error.error || '添加失败', 'error');
+                const result = await uploadPromise;
+                
+                // 上传成功
+                if (imageFile) {
+                    progressBar.style.width = '100%';
+                    progressText.textContent = '上传完成！';
                 }
+                
+                showAlert('图片添加成功！', 'success');
+                document.getElementById('uploadForm').reset();
+                
+                // 隐藏进度条
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 1000);
+                
+                // 延迟更新统计信息，避免阻塞UI
+                setTimeout(() => {
+                    updateStatsOptimized();
+                }, 100);
+                
+                // 如果当前在管理图片标签页，优化刷新
+                if (document.getElementById('manageTab').classList.contains('active')) {
+                    setTimeout(() => {
+                        loadImages(currentPage);
+                    }, 200);
+                }
+                
             } catch (error) {
-                showAlert('网络错误：' + error.message, 'error');
+                showAlert(error.message || '网络错误', 'error');
+                progressContainer.style.display = 'none';
+            } finally {
+                // 恢复按钮状态
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         });
         
@@ -913,26 +1114,45 @@
                 return;
             }
             
-            container.innerHTML = images.map(image => {
+            // 使用DocumentFragment提高性能
+            const fragment = document.createDocumentFragment();
+            
+            images.forEach(image => {
                 // 构建缩略图URL
                 let thumbnailUrl = '';
                 if (image.is_local && image.thumbnail) {
-                    thumbnailUrl = `/api/thumbnails/${image.thumbnail}`;
+                    // 使用缩略图服务，默认使用medium尺寸
+                    thumbnailUrl = `/thumbnails/medium/${image.thumbnail}`;
+                } else if (image.is_local && image.filename) {
+                    // 如果没有缩略图但有文件名，尝试生成medium尺寸缩略图
+                    thumbnailUrl = `/thumbnails/medium/medium_${image.filename}`;
                 } else if (image.is_local) {
+                    // 回退到原图
                     thumbnailUrl = `/api/images/${image.id}`;
                 } else {
-                    // 对于URL图片，尝试使用原图
-                    thumbnailUrl = image.url;
+                    // 对于URL图片，使用原图，添加适当的代理和缓存参数
+                    if (image.url && image.url.includes('unsplash.com')) {
+                        // 对于Unsplash图片，添加尺寸参数以获得更小的图片作为缩略图
+                        thumbnailUrl = image.url.replace(/w=\d+&h=\d+/, 'w=300&h=300');
+                    } else {
+                        thumbnailUrl = image.url;
+                    }
                 }
                 
-                return `
-                <div class="image-card" data-image-id="${image.id}">
+                const imageCard = document.createElement('div');
+                imageCard.className = 'image-card';
+                imageCard.setAttribute('data-image-id', image.id);
+                
+                imageCard.innerHTML = `
                     <div class="thumbnail-container">
                         <input type="checkbox" class="image-checkbox" onchange="toggleImageSelection(${image.id}, this)">
-                        <img src="${thumbnailUrl}" 
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iMjAiIGZpbGw9IiNEMUQ1REIiLz4KPHRleHQgeD0iMTUwIiB5PSIxNDAiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjEyIiBmaWxsPSIjNjY2NjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7liqDovb3kuK08L3RleHQ+Cjwvc3ZnPgo=" 
                              alt="${image.original_name || '图片'}" 
-                             class="thumbnail"
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjEwMCIgY3k9IjEwMCIgcj0iMzAiIGZpbGw9IiNEMUQ1REIiLz4KPHN2Zz4K'">
+                             class="thumbnail placeholder-image"
+                             data-src="${thumbnailUrl}"
+                             data-image-id="${image.id}"
+                             data-type="${image.is_local ? 'local' : 'url'}"
+                             loading="lazy">
                         <div class="thumbnail-overlay">
                             <span class="image-id">#${image.id}</span>
                         </div>
@@ -949,11 +1169,89 @@
                             <button class="btn btn-danger" onclick="deleteImage(${image.id})">删除</button>
                         </div>
                     </div>
-                </div>
-            `}).join('');
+                `;
+                
+                fragment.appendChild(imageCard);
+            });
+            
+            // 清空容器并添加新内容
+            container.innerHTML = '';
+            container.appendChild(fragment);
+            
+            // 初始化懒加载
+            initializeLazyLoading();
             
             // 显示或隐藏批量操作工具栏
             updateBatchToolbarVisibility();
+        }
+        
+        // 懒加载实现
+        let imageObserver = null;
+        
+        function initializeLazyLoading() {
+            // 如果浏览器不支持Intersection Observer，直接加载所有图片
+            if (!('IntersectionObserver' in window)) {
+                loadAllImages();
+                return;
+            }
+            
+            // 创建Intersection Observer
+            if (imageObserver) {
+                imageObserver.disconnect();
+            }
+            
+            imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        loadImage(img);
+                        observer.unobserve(img);
+                    }
+                });
+            }, {
+                rootMargin: '50px 0px', // 提前50px开始加载
+                threshold: 0.1
+            });
+            
+            // 观察所有占位符图片
+            const placeholderImages = document.querySelectorAll('.placeholder-image');
+            placeholderImages.forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+        
+        function loadImage(img) {
+            const src = img.getAttribute('data-src');
+            const imageId = img.getAttribute('data-image-id');
+            const type = img.getAttribute('data-type');
+            
+            if (src) {
+                // 添加加载状态
+                img.classList.add('loading');
+                
+                // 创建新的图片对象进行预加载
+                const newImg = new Image();
+                
+                newImg.onload = function() {
+                    img.src = src;
+                    img.classList.remove('placeholder-image', 'loading');
+                    img.classList.add('loaded');
+                };
+                
+                newImg.onerror = function() {
+                    handleThumbnailError(img, imageId, type);
+                    img.classList.remove('placeholder-image', 'loading');
+                };
+                
+                newImg.src = src;
+            }
+        }
+        
+        function loadAllImages() {
+            const placeholderImages = document.querySelectorAll('.placeholder-image');
+            placeholderImages.forEach(img => {
+                loadImage(img);
+            });
         }
         
         // 批量操作相关变量和函数
@@ -1542,6 +1840,302 @@
                 document.getElementById('categories').textContent = categories;
             } catch (error) {
                 console.error('Failed to update stats:', error);
+            }
+        }
+        
+        // 优化的统计信息更新 - 使用缓存和节流
+        let statsUpdateTimer = null;
+        async function updateStatsOptimized() {
+            // 防抖 - 避免频繁更新
+            if (statsUpdateTimer) {
+                clearTimeout(statsUpdateTimer);
+            }
+            
+            statsUpdateTimer = setTimeout(async () => {
+                try {
+                    // 只获取统计数据，不获取完整图片列表
+                    const response = await fetch('/api/stats');
+                    if (response.ok) {
+                        const stats = await response.json();
+                        document.getElementById('totalImages').textContent = stats.total || 0;
+                        document.getElementById('landscapeImages').textContent = stats.landscape || 0;
+                        document.getElementById('portraitImages').textContent = stats.portrait || 0;
+                        document.getElementById('categories').textContent = stats.categories || 0;
+                    } else {
+                        // 回退到原方法
+                        updateStats();
+                    }
+                } catch (error) {
+                    console.error('Failed to update optimized stats:', error);
+                    // 回退到原方法
+                    updateStats();
+                }
+            }, 300); // 300ms防抖
+        }
+        
+        // 加载缩略图统计信息
+        async function loadThumbnailStats() {
+            try {
+                const response = await fetch('/thumbnails/stats', {
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const statsEl = document.getElementById('thumbnailStats');
+                    statsEl.innerHTML = `
+                        总图片: ${data.total} | 
+                        有缩略图: ${data.withThumbnails} | 
+                        覆盖率: ${data.coverage}% | 
+                        缺失: ${data.withoutThumbnails}
+                    `;
+                } else {
+                    showAlert(data.error || '获取缩略图统计失败', 'error');
+                }
+            } catch (error) {
+                console.warn('无法获取缩略图统计:', error);
+                document.getElementById('thumbnailStats').textContent = '统计信息获取失败';
+            }
+        }
+        
+        // 缩略图错误处理
+        function handleThumbnailError(imgElement, imageId, type) {
+            console.warn(`Thumbnail failed to load for image ${imageId} (${type})`);
+            
+            if (type === 'local') {
+                // 对于本地图片，先尝试原图API
+                const fallbackUrl = `/api/images/${imageId}`;
+                if (imgElement.src !== fallbackUrl) {
+                    imgElement.src = fallbackUrl;
+                    return;
+                }
+            }
+            
+            // 最终回退到占位符
+            imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDMwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iMzAiIGZpbGw9IiNEMUQ1REIiLz4KPHBhdGggZD0iTTEwMCAxNDBMMTQwIDEyMEwxODAgMTUwTDE2MCAyMDBMMTIwIDIwMEwxMDAgMTQwWiIgZmlsbD0iI0QxRDVEQiIvPgo8dGV4dCB4PSIxNTAiIHk9IjI0MCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2NjY2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPuWbvueJh+WKoOi9veWksei0pTwvdGV4dD4KPHN2Zz4K';
+            imgElement.style.opacity = '0.6';
+            imgElement.title = '图片加载失败';
+        }
+        
+        // 批量生成缺失缩略图
+        async function generateMissingThumbnails() {
+            try {
+                const response = await fetch('/thumbnails/generate-missing', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert(data.message, 'success');
+                    // 5秒后刷新图片列表
+                    setTimeout(() => {
+                        loadImages(currentPage);
+                    }, 5000);
+                } else {
+                    showAlert(data.error || '生成缩略图失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误：' + error.message, 'error');
+            }
+        }
+        
+        // 系统设置功能
+        async function loadSystemSettings() {
+            try {
+                const response = await fetch('/system', {
+                    credentials: 'include'
+                });
+                const configs = await response.json();
+                
+                // 填充表单
+                if (configs && Array.isArray(configs)) {
+                    configs.forEach(config => {
+                        const element = document.querySelector(`[name="${config.config_key}"]`);
+                        if (element) {
+                            element.value = config.config_value;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Load system settings error:', error);
+                showAlert('加载系统设置失败', 'error');
+            }
+        }
+        
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const configs = [];
+            
+            for (const [key, value] of formData.entries()) {
+                configs.push({
+                    config_key: key,
+                    config_value: value,
+                    description: getConfigDescription(key)
+                });
+            }
+            
+            try {
+                const response = await fetch('/system/batch', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ configs }),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert('系统设置保存成功', 'success');
+                    if (data.errors && data.errors.length > 0) {
+                        showAlert('部分设置保存失败：' + data.errors.join(', '), 'error');
+                    }
+                } else {
+                    showAlert(data.error || '保存系统设置失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误：' + error.message, 'error');
+            }
+        });
+        
+        function getConfigDescription(key) {
+            const descriptions = {
+                'registration_enabled': '是否允许新用户注册',
+                'registration_require_approval': '新注册用户是否需要管理员审批',
+                'max_users': '系统最大用户数量限制',
+                'site_maintenance': '网站维护模式开关',
+                'registration_message': '注册页面显示的欢迎消息'
+            };
+            return descriptions[key] || '';
+        }
+        
+        async function loadPendingUsers() {
+            try {
+                const response = await fetch('/system/pending-users', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                displayPendingUsers(data.pending_users || []);
+            } catch (error) {
+                console.error('Load pending users error:', error);
+                document.getElementById('pendingUsersContainer').innerHTML = '<div class="loading">加载失败</div>';
+            }
+        }
+        
+        function displayPendingUsers(users) {
+            const container = document.getElementById('pendingUsersContainer');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<div class="loading">暂无待审核用户</div>';
+                return;
+            }
+            
+            const table = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e1e5e9;">用户名</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e1e5e9;">邮箱</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e1e5e9;">注册时间</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e1e5e9;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${users.map(user => `
+                            <tr style="border-bottom: 1px solid #e1e5e9;">
+                                <td style="padding: 12px;">${user.username}</td>
+                                <td style="padding: 12px;">${user.email || '-'}</td>
+                                <td style="padding: 12px;">${new Date(user.created_at).toLocaleString()}</td>
+                                <td style="padding: 12px;">
+                                    <button class="btn" style="padding: 4px 8px; font-size: 12px; margin-right: 5px;" onclick="approveUser(${user.id}, true)">批准</button>
+                                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="approveUser(${user.id}, false)">拒绝</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = table;
+        }
+        
+        async function approveUser(userId, approved) {
+            const action = approved ? '批准' : '拒绝';
+            if (!confirm(`确定要${action}这个用户吗？`)) return;
+            
+            try {
+                const response = await fetch(`/system/approve-user/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ approved }),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showAlert(`用户${action}成功`, 'success');
+                    loadPendingUsers();
+                } else {
+                    showAlert(data.error || `${action}用户失败`, 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误：' + error.message, 'error');
+            }
+        }
+        
+        async function loadSystemInfo() {
+            try {
+                const [statsResponse, configResponse] = await Promise.all([
+                    fetch('/api/images?paginated=false'),
+                    fetch('/system/public/registration-status')
+                ]);
+                
+                const images = await statsResponse.json();
+                const systemStatus = await configResponse.json();
+                
+                const systemInfo = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${images.length}</div>
+                            <div>总图片数量</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${systemStatus.current_users}</div>
+                            <div>当前用户数</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 2em; font-weight: bold; color: #667eea;">${systemStatus.max_users}</div>
+                            <div>最大用户数</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: ${systemStatus.registration_enabled ? '#28a745' : '#dc3545'};">
+                                ${systemStatus.registration_enabled ? '开启' : '关闭'}
+                            </div>
+                            <div>注册状态</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: ${systemStatus.maintenance_mode ? '#ffc107' : '#28a745'};">
+                                ${systemStatus.maintenance_mode ? '维护中' : '正常'}
+                            </div>
+                            <div>系统状态</div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('systemInfoContainer').innerHTML = systemInfo;
+            } catch (error) {
+                console.error('Load system info error:', error);
+                document.getElementById('systemInfoContainer').innerHTML = '<div class="loading">加载失败</div>';
             }
         }
         
