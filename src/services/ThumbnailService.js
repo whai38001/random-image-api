@@ -2,6 +2,8 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs-extra');
 const Database = require('../models/Database');
+const ImageWorkerPool = require('../utils/imageWorkerPool');
+const logger = require('../utils/logger');
 
 class ThumbnailService {
   constructor() {
@@ -16,6 +18,9 @@ class ThumbnailService {
       medium: { width: 300, height: 300 },
       large: { width: 500, height: 500 }
     };
+    
+    // 🚀 初始化Worker线程池
+    this.workerPool = new ImageWorkerPool(2); // 2个Worker线程
     
     // 确保缩略图目录存在
     this.ensureDirectories();
@@ -34,41 +39,39 @@ class ThumbnailService {
     }
   }
 
-  // 生成单个缩略图
+  // 🚀 生成单个缩略图 - 使用Worker线程池
   async generateThumbnail(imagePath, outputPath, size = 'medium', quality = 80) {
     try {
-      const { width, height } = this.thumbnailSizes[size];
-      
       // 检查原图是否存在
       if (!(await fs.pathExists(imagePath))) {
         throw new Error(`Original image not found: ${imagePath}`);
       }
 
-      // 获取图片元数据
-      const metadata = await sharp(imagePath).metadata();
+      // 使用Worker线程池生成缩略图
+      const result = await this.workerPool.generateThumbnail(imagePath, outputPath, size);
       
-      // 创建缩略图
-      await sharp(imagePath)
-        .resize(width, height, {
-          fit: 'cover',
-          position: 'center',
-          withoutEnlargement: false
-        })
-        .jpeg({ 
-          quality,
-          progressive: true,
-          mozjpeg: true // 更好的压缩
-        })
-        .toFile(outputPath);
+      logger.performance('Thumbnail generated', {
+        imagePath,
+        outputPath,
+        size,
+        outputSize: result.size
+      });
 
       return {
         success: true,
-        originalSize: { width: metadata.width, height: metadata.height },
-        thumbnailSize: { width, height },
-        outputPath
+        originalSize: result.dimensions,
+        thumbnailSize: result.dimensions,
+        outputPath: result.outputPath,
+        fileSize: result.size
       };
     } catch (error) {
-      console.error(`Error generating thumbnail for ${imagePath}:`, error);
+      logger.error(`Error generating thumbnail for ${imagePath}`, { 
+        error: error.message,
+        imagePath,
+        outputPath,
+        size 
+      });
+      
       return {
         success: false,
         error: error.message

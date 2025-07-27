@@ -62,13 +62,13 @@ router.post('/login', loginLimiter, upload.none(), async (req, res) => {
       return res.status(400).json({ error: '请填写完整信息' });
     }
 
-    // 临时禁用验证码验证，直接通过
     // 验证验证码
-    // const captchaResult = captchaService.verifyCaptcha(captchaId, captchaText);
-    // if (!captchaResult.success) {
-    //   return res.status(400).json({ error: captchaResult.error });
-    // }
-    console.log('Captcha verification temporarily disabled');
+    const captchaResult = captchaService.verifyCaptcha(captchaId, captchaText);
+    if (!captchaResult.success) {
+      console.log(`验证码验证失败: ${captchaResult.error}, IP: ${req.ip}`);
+      return res.status(400).json({ error: captchaResult.error });
+    }
+    console.log('验证码验证通过');
 
     // 验证用户
     const user = await db.getUserByUsername(username);

@@ -13,6 +13,10 @@ const AnalyticsMiddleware = require('./middleware/analytics');
 const SecurityMiddleware = require('./middleware/security');
 const { checkAccess, authenticateSession } = require('./middleware/auth');
 
+// 导入监控和日志系统
+const logger = require('./utils/logger');
+const performanceMonitor = require('./utils/performanceMonitor');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -35,6 +39,9 @@ app.use(helmet({
 
 // 信任代理（用于获取真实IP）
 app.set('trust proxy', 1);
+
+// 🔧 性能监控中间件 - 在所有其他中间件之前
+app.use(performanceMonitor.trackRequest());
 
 // 全局限流 - 更严格的配置
 const globalLimiter = rateLimit({
@@ -85,9 +92,16 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 会话配置
+// 会话配置 - 强制要求SESSION_SECRET环境变量
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  console.error('❌ 错误: SESSION_SECRET 环境变量是必需的!');
+  console.error('请设置: export SESSION_SECRET=your-super-secret-key');
+  process.exit(1);
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-in-production',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -188,14 +202,41 @@ app.use('/system', systemRoutes);
 // 管理后台路由保护
 app.use('/admin*', authenticateSession);
 
-// 健康检查端点
+// 🏥 增强健康检查端点
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
+  const healthStatus = performanceMonitor.healthCheck();
+  const statusCode = healthStatus.status === 'healthy' ? 200 : 
+                     healthStatus.status === 'warning' ? 200 : 503;
+  
+  res.status(statusCode).json({
+    ...healthStatus,
     port: PORT,
-    pid: process.pid
+    pid: process.pid,
+    nodeVersion: process.version,
+    uptime: process.uptime()
   });
+});
+
+// 📊 性能监控端点（需要认证）
+app.get('/monitoring/metrics', authenticateSession, (req, res) => {
+  try {
+    const report = performanceMonitor.getPerformanceReport();
+    res.json(report);
+  } catch (error) {
+    logger.error('Failed to get performance metrics', { error: error.message });
+    res.status(500).json({ error: 'Failed to get performance metrics' });
+  }
+});
+
+// 📈 系统状态端点
+app.get('/monitoring/status', authenticateSession, (req, res) => {
+  try {
+    const systemMetrics = performanceMonitor.getSystemMetrics();
+    res.json(systemMetrics);
+  } catch (error) {
+    logger.error('Failed to get system status', { error: error.message });
+    res.status(500).json({ error: 'Failed to get system status' });
+  }
 });
 
 // 根路径显示API文档
@@ -245,14 +286,23 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Random Image API server is running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Login page: http://localhost:${PORT}/login`);
-  console.log(`Register page: http://localhost:${PORT}/register`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin`);
-  console.log(`API endpoint: http://localhost:${PORT}/api/random`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Default admin account: admin/admin123`);
+  // 🚀 启动日志
+  logger.systemEvent('server_started', {
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    nodeVersion: process.version,
+    pid: process.pid
+  });
+  
+  console.log(`🚀 Random Image API server is running on port ${PORT}`);
+  console.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔐 Login page: http://localhost:${PORT}/login`);
+  console.log(`👤 Register page: http://localhost:${PORT}/register`);
+  console.log(`⚙️  Admin panel: http://localhost:${PORT}/admin`);
+  console.log(`🔗 API endpoint: http://localhost:${PORT}/api/random`);
+  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  console.log(`📊 Monitoring: http://localhost:${PORT}/monitoring/metrics`);
+  console.log(`👑 Default admin account: admin/admin123`);
   
   // 生产环境安全提醒
   if (process.env.NODE_ENV === 'production') {
@@ -262,16 +312,30 @@ app.listen(PORT, () => {
     console.log('✅ Configure HTTPS (set HTTPS=true)');
     console.log('✅ Review access control settings');
     console.log('✅ Configure email service (SMTP settings)');
+    
+    logger.security('Production server started', {
+      port: PORT,
+      nodeVersion: process.version,
+      pid: process.pid
+    });
   } else {
     console.log('\n⚠️  Development Environment - Use production script for deployment');
   }
+  
+  console.log('\n📊 监控系统已启用：');
+  console.log('- 📈 实时性能监控');
+  console.log('- 📝 结构化日志记录');
+  console.log('- 🔍 健康检查端点');
+  console.log('- ⚡ 响应时间追踪');
 
   // 启动定时任务更新日统计（每小时执行一次）
   setInterval(async () => {
     try {
       await analyticsMiddleware.updateDailyStatsTask();
+      logger.systemEvent('daily_stats_updated');
       console.log('📊 Daily statistics updated automatically');
     } catch (error) {
+      logger.error('Auto update daily stats failed', { error: error.message });
       console.error('❌ Auto update daily stats failed:', error);
     }
   }, 60 * 60 * 1000); // 1小时

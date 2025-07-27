@@ -5,11 +5,13 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 const Database = require('../models/Database');
 const ThumbnailService = require('../services/ThumbnailService');
+const FileValidation = require('../utils/fileValidation');
 const { authenticateSession } = require('../middleware/auth');
 
 const router = express.Router();
 const db = new Database();
 const thumbnailService = new ThumbnailService();
+const fileValidator = new FileValidation();
 
 // 统计信息端点 - 优化性能
 router.get('/stats', async (req, res) => {
@@ -200,6 +202,32 @@ router.post('/images', authenticateSession, upload.single('image'), async (req, 
     let imageData;
 
     if (req.file) {
+      // 🔒 增强文件安全验证
+      console.log(`🔍 开始安全验证文件: ${req.file.originalname}`);
+      const validationResult = await fileValidator.validateFile(req.file, req.file.path);
+      
+      if (!validationResult.isValid) {
+        // 删除不安全的文件
+        try {
+          await fs.unlink(req.file.path);
+          console.log(`🗑️ 删除不安全文件: ${req.file.path}`);
+        } catch (unlinkError) {
+          console.error('删除文件失败:', unlinkError);
+        }
+        
+        return res.status(400).json({ 
+          error: '文件安全验证失败', 
+          details: validationResult.errors 
+        });
+      }
+      
+      // 如果有警告，记录但不阻止上传
+      if (validationResult.warnings.length > 0) {
+        console.log(`⚠️ 文件验证警告:`, validationResult.warnings);
+      }
+      
+      console.log(`✅ 文件安全验证通过: ${req.file.originalname}`);
+      
       const metadata = await sharp(req.file.path).metadata();
       const detectedOrientation = metadata.width > metadata.height ? 'landscape' : 'portrait';
       
@@ -222,6 +250,16 @@ router.post('/images', authenticateSession, upload.single('image'), async (req, 
         thumbnail: `medium_${req.file.filename}` // 预设缩略图名称
       };
     } else if (url) {
+      // URL验证
+      try {
+        const urlObj = new URL(url);
+        if (!['http:', 'https:'].includes(urlObj.protocol)) {
+          return res.status(400).json({ error: '只允许HTTP/HTTPS协议的URL' });
+        }
+      } catch (urlError) {
+        return res.status(400).json({ error: '无效的URL格式' });
+      }
+      
       imageData = {
         filename: '',
         original_name: '',

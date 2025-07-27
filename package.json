@@ -31,7 +31,8 @@
     "path": "^0.12.7",
     "sharp": "^0.32.6",
     "sqlite3": "^5.1.6",
-    "svg-captcha": "^1.4.0"
+    "svg-captcha": "^1.4.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
