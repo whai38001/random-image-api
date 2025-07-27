@@ -65,12 +65,25 @@ npm install
 ```
 
 3. **启动服务**
+
+**开发环境:**
 ```bash
-# 使用启动脚本（推荐）
+# 开发模式启动
 ./start-server.sh
 
 # 或直接启动
 npm start
+```
+
+**生产环境:**
+```bash
+# 生产环境启动 (推荐)
+./start-production.sh
+
+# 手动设置生产环境
+export NODE_ENV=production
+export SESSION_SECRET=your-custom-secret-key
+node src/app.js
 ```
 
 4. **访问服务**
@@ -211,14 +224,53 @@ NODE_ENV=production
 # 数据库配置
 DB_PATH=./config/images.db
 
-# 会话配置
-SESSION_SECRET=your-super-secret-session-key
-
 # 安全配置
+SESSION_SECRET=your-custom-secret-key
+HTTPS=true                    # 启用HTTPS时设置为true
+
+# CORS配置
 CORS_ORIGIN=*
+
+# 限流配置
 RATE_LIMIT_WINDOW=15
 RATE_LIMIT_MAX=1000
+LOGIN_RATE_LIMIT=5
 ```
+
+### 生产环境配置
+
+#### 🛡️ **安全配置要求**
+
+1. **必须设置的环境变量:**
+```bash
+export NODE_ENV=production
+export SESSION_SECRET=your-super-secret-session-key-$(date +%s)
+```
+
+2. **HTTPS环境配置:**
+```bash
+export HTTPS=true             # 启用安全Cookie
+export COOKIE_SECURE=true     # 强制安全Cookie
+```
+
+3. **生产环境启动:**
+```bash
+# 使用生产启动脚本 (自动配置安全参数)
+./start-production.sh
+
+# 手动启动生产环境
+export NODE_ENV=production
+export SESSION_SECRET=your-custom-secret
+node src/app.js
+```
+
+#### 🔍 **生产环境检查清单**
+
+启动后系统会自动显示安全检查清单：
+- ✅ 更改默认管理员密码 (admin/admin123)
+- ✅ 设置自定义SESSION_SECRET
+- ✅ 配置HTTPS (如适用)
+- ✅ 审核访问控制设置
 
 ### 反向代理配置
 
@@ -262,6 +314,9 @@ random-image-api/
 │   ├── api-docs.html       # API文档
 │   └── login.html          # 登录页面
 ├── config/                 # 数据库文件目录
+├── start-server.sh         # 开发环境启动脚本
+├── start-production.sh     # 生产环境启动脚本
+├── .env.example            # 环境变量示例文件
 ├── package.json
 ├── Dockerfile
 └── README.md
@@ -276,6 +331,41 @@ node add-images.js
 ```
 
 这将添加100张高质量测试图片到数据库。
+
+### 环境差异说明
+
+#### 开发环境 vs 生产环境
+
+| 特性 | 开发环境 | 生产环境 |
+|------|----------|----------|
+| NODE_ENV | development | production |
+| 会话密钥 | 默认值 | 动态生成 |
+| Cookie安全 | 关闭 | 根据HTTPS自适应 |
+| 安全提醒 | 基础 | 完整检查清单 |
+| 启动脚本 | `./start-server.sh` | `./start-production.sh` |
+
+#### 环境变量配置
+
+**开发环境配置:**
+```bash
+# 复制环境变量模板
+cp .env.example .env.development
+
+# 编辑开发配置
+NODE_ENV=development
+SESSION_SECRET=dev-secret-key
+```
+
+**生产环境配置:**
+```bash
+# 复制环境变量模板  
+cp .env.example .env.production
+
+# 编辑生产配置
+NODE_ENV=production
+SESSION_SECRET=your-super-secure-production-key
+HTTPS=true
+```
 
 ### 健康检查
 

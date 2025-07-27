@@ -52,7 +52,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // 生产环境中使用HTTPS时设为true
+    secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true', // 生产环境+HTTPS时启用
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24小时
   }
@@ -114,8 +114,21 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Random Image API server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Login page: http://localhost:${PORT}/login`);
   console.log(`Admin panel: http://localhost:${PORT}/admin`);
   console.log(`API endpoint: http://localhost:${PORT}/api/random`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Default admin account: admin/admin123`);
+  
+  // 生产环境安全提醒
+  if (process.env.NODE_ENV === 'production') {
+    console.log('\n🛡️  Production Environment Security Checklist:');
+    console.log('✅ Change default admin password');
+    console.log('✅ Set custom SESSION_SECRET');
+    console.log('✅ Configure HTTPS (set HTTPS=true)');
+    console.log('✅ Review access control settings');
+  } else {
+    console.log('\n⚠️  Development Environment - Use production script for deployment');
+  }
 });
