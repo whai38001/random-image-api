@@ -108,6 +108,7 @@ PORT=3001
 
 # 安全配置
 SESSION_SECRET=your-super-secret-session-key
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
 
 # 数据库配置
 DB_PATH=./config/images.db
@@ -194,9 +195,12 @@ GET /api/analytics
 
 1. **默认账户**: 首次启动会创建默认管理员账户，请立即修改密码
 2. **会话安全**: 使用安全的Session密钥，建议在生产环境中更改
-3. **访问控制**: 支持IP黑白名单和域名限制
-4. **频率限制**: 防止API滥用和暴力破解攻击
-5. **HTTPS支持**: 支持HTTPS部署，提高传输安全性
+3. **JWT认证**: 使用强随机密钥的JWT令牌认证
+4. **访问控制**: 支持IP黑白名单和域名限制
+5. **频率限制**: 防止API滥用和暴力破解攻击
+6. **HTTPS支持**: 支持HTTPS部署，提高传输安全性
+
+详细安全配置请查看 [安全文档](docs/SECURITY.md) 和 [JWT认证说明](docs/JWT.md)。
 
 ## 📁 项目结构
 
@@ -211,6 +215,7 @@ random-image-api/
 │   ├── models/       # 数据模型
 │   ├── middleware/   # 中间件
 │   └── utils/        # 工具函数
+├── docs/             # 详细文档
 ├── logs/             # 日志文件
 ├── .env              # 环境配置文件
 ├── Dockerfile        # Docker配置

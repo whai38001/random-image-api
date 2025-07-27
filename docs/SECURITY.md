@@ -37,6 +37,9 @@
 # 会话密钥（必须修改）
 SESSION_SECRET=your-super-secret-session-key-change-me
 
+# JWT密钥（必须修改）
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
 # HTTPS配置
 HTTPS=true
 COOKIE_SECURE=true
@@ -103,6 +106,7 @@ LOGIN_RATE_LIMIT=5
 
 - [ ] 修改默认管理员密码
 - [ ] 设置自定义SESSION_SECRET
+- [ ] 设置自定义JWT_SECRET
 - [ ] 配置HTTPS证书
 - [ ] 设置IP访问控制规则
 - [ ] 配置域名白名单
