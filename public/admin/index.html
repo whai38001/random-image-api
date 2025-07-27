@@ -1884,12 +1884,29 @@
                 
                 if (response.ok) {
                     const statsEl = document.getElementById('thumbnailStats');
-                    statsEl.innerHTML = `
-                        总图片: ${data.total} | 
-                        有缩略图: ${data.withThumbnails} | 
-                        覆盖率: ${data.coverage}% | 
-                        缺失: ${data.withoutThumbnails}
-                    `;
+                    
+                    if (data.total === 0) {
+                        // 没有本地图片的情况
+                        statsEl.innerHTML = `
+                            <div style="color: #ff6b6b; font-weight: bold;">
+                                ${data.message}
+                            </div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                                ${data.urlImages > 0 ? `当前系统中有 ${data.urlImages} 张URL图片` : ''}
+                            </div>
+                        `;
+                    } else {
+                        // 有本地图片的情况
+                        statsEl.innerHTML = `
+                            <div>
+                                本地图片: ${data.total} | 
+                                有缩略图: ${data.withThumbnails} | 
+                                覆盖率: ${data.coverage}% | 
+                                缺失: ${data.withoutThumbnails}
+                            </div>
+                            ${data.message ? `<div style="font-size: 12px; color: #666; margin-top: 3px;">${data.message}</div>` : ''}
+                        `;
+                    }
                 } else {
                     showAlert(data.error || '获取缩略图统计失败', 'error');
                 }

@@ -259,6 +259,7 @@ class ThumbnailService {
     try {
       const images = await this.db.getAllImages();
       const localImages = images.filter(img => img.is_local === 1);
+      const urlImages = images.filter(img => img.is_local === 0);
       
       let withThumbnails = 0;
       let withoutThumbnails = 0;
@@ -268,6 +269,23 @@ class ThumbnailService {
         large: 0
       };
       
+      // 如果没有本地图片，返回明确的统计信息
+      if (localImages.length === 0) {
+        return {
+          total: 0,
+          withThumbnails: 0,
+          withoutThumbnails: 0,
+          coverage: 0,
+          totalSizes,
+          urlImages: urlImages.length,
+          message: urlImages.length > 0 ? 
+            `系统中有 ${urlImages.length} 张URL图片，但只有本地上传的图片才能生成缩略图。请上传本地图片文件来生成缩略图。` :
+            '系统中暂无图片。请先上传图片文件。',
+          timestamp: new Date().toISOString()
+        };
+      }
+      
+      // 检查本地图片的缩略图状态
       for (const image of localImages) {
         if (!image.filename) {
           withoutThumbnails++;
@@ -294,12 +312,17 @@ class ThumbnailService {
         }
       }
       
+      const coverage = localImages.length > 0 ? (withThumbnails / localImages.length * 100).toFixed(2) : 0;
+      
       return {
         total: localImages.length,
         withThumbnails,
         withoutThumbnails,
-        coverage: localImages.length > 0 ? (withThumbnails / localImages.length * 100).toFixed(2) : 0,
+        coverage,
         totalSizes,
+        urlImages: urlImages.length,
+        message: urlImages.length > 0 ? 
+          `另有 ${urlImages.length} 张URL图片无需生成缩略图` : null,
         timestamp: new Date().toISOString()
       };
       
